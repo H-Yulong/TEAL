@@ -1,0 +1,8 @@
+name: TEAL
+depend: standard-library
+include: .
+flags:
+  --without-K
+  --erasure
+  --safe
+  
