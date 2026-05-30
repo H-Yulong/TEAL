@@ -1,4 +1,4 @@
-module DLC.Syntax where
+module Defunctionalized.Calculus.Syntax where
 
 open import Basic
 open import Context
@@ -73,27 +73,6 @@ unit [ σ ] = unit
 get : ∀{D Δ A B} → LVar D Δ A B → Tm D (Δ ∷ A) B
 get {D = D ⨾ t} ℓ₀ = Lren Lwk t
 get {D = D} (ℓs ℓ) = Lren Lwk (get ℓ)
-
-{- Reduction -}
-data _⟶_ {D : LCon} : ∀{Γ A} → Tm D Γ A → Tm D Γ A → Set where
-  red-β :
-    ∀ {Γ Δ A B} → 
-      {ℓ : LVar D Δ A B}{st : St D Γ Δ}
-      {t : Tm D Γ A} →  
-      app (lab ℓ st) t ⟶ ((get ℓ) [ st , t ])
-  red-app : 
-    ∀ {Γ A B} → 
-      {s s' : Tm D Γ (A ⇒ B)}{t : Tm D Γ A} →
-      s ⟶ s' → app s t ⟶ app s' t
-
-
-
-
-
-
-
-
-
 
 
 
