@@ -374,36 +374,9 @@ Preservation Op-app (well-formed (Ty-⨾ Ty-app ty-ins) ty-env (St-cons (St-cons
   well-formed ty-ins' (Env-cons tv ty-env') St-nil (Frame-cons ty-fr ty-ins ty-env ty-st ⦃ eq ⦄ ) 
   (~λ-ext (cong-app (~λ≡ eq-f) _))
 
-{-
-
-cong-app {f = f .~fun } ? (t' .~fun (γ tt)) 
-Not an easy problem.
-
-eq-f : lam (t [ ↑ γ ]) = t1
-
-goal: t [ γ , t'[γ] ] ≡ (app (t1 t')) [ γ ]
-where
-  (app t1 t') [ γ ]
-    = (t1 [ γ ]) (t' [ γ ])
-    { key step to evaluate is here }
-    = (lam t [↑γ]) (t' [ γ ])
-    = (t [ ↑γ ]) [ id , t' [ γ ] ]
-    = t [ γ , t' [ γ ]]
-
-t₁ .~fun (γ₁ tt) (t' .~fun (γ₁ tt))
-
-(λ a → t .~fun (γ tt , a)) ≡
-t₁ .~fun (γ₁ tt)
-
-so, t₁ .~fun (γ₁ tt) (t' .~fun (γ₁ tt))
-= t .~fun (γ tt , (t' .~fun (γ₁ tt)))
-
-exactly what we want.
-
--}
-
 Preservation Op-unit (well-formed (Ty-⨾ Ty-unit ty-ins) ty-env ty-st ty-fr eq) = 
   well-formed ty-ins ty-env (St-cons ty-st Ty-unit) ty-fr eq
+
 Preservation Op-pushc (well-formed (Ty-⨾ (Ty-pushc ty-ins') ty-ins) ty-env ty-st ty-fr eq) = 
   well-formed ty-ins ty-env (St-cons ty-st (Ty-clo ty-env ty-ins')) ty-fr eq
 
@@ -413,16 +386,20 @@ Preservation (Op-clo pf eq-n) (well-formed (Ty-⨾ (Ty-clo eq-s eq-n' ty-ins') t
 
 Preservation Op-ret (well-formed (Ty-ret ⦃ refl ⦄) ty-env (St-cons {v = v} ty-st tv) (Frame-cons ty-fr ty-ins' ty-env' ty-st' ⦃ eq' ⦄) eq) = 
   well-formed ty-ins' ty-env' (St-cons ty-st' (subst (λ z → ⊢ v == z) eq tv)) ty-fr eq'
+
 Preservation (Op-var tx) (well-formed (Ty-⨾ (Ty-var x) ty-ins) ty-env ty-st ty-fr eq) = 
   well-formed ty-ins ty-env (St-cons ty-st (ty-[↦]∈ ty-env tx)) ty-fr eq
+
 Preservation (Op-st tx) (well-formed (Ty-⨾ (Ty-st x) ty-ins) ty-env ty-st ty-fr eq) = 
   well-formed ty-ins ty-env (St-cons ty-st (st-[↦]∈ ty-st tx)) ty-fr eq
+
 Preservation (Op-lit n) (well-formed (Ty-⨾ (Ty-lit n) ty-ins) ty-env ty-st ty-fr eq) = 
   well-formed ty-ins ty-env (St-cons ty-st Ty-nat) ty-fr eq
 
 Preservation Op-suc (well-formed (Ty-⨾ Ty-suc ty-ins) ty-env (St-cons ty-st (Ty-nat ⦃ eq-n ⦄)) ty-fr eq) = 
   well-formed ty-ins ty-env (St-cons ty-st (Ty-nat ⦃ cong ~λ (ext-tt (cong suc (cong-app (cong ~fun eq-n) tt))) ⦄)) ty-fr eq
 
+-- Allocating a new call frame is the key to showing type preservation.
 Preservation Op-recZ (well-formed (Ty-⨾ (Ty-rec {tZ = tZ} {tS = tS} ty-Z ty-S) ty-ins) ty-env (St-cons ty-st (Ty-nat {n = zero} ⦃ eq-n ⦄)) ty-fr eq) = 
   well-formed ty-Z ty-env St-nil (Frame-cons ty-fr ty-ins ty-env ty-st ⦃ eq ⦄ ) 
   (M.rec-Z eq-n)
@@ -442,8 +419,10 @@ Preservation (Op-mult m n) (well-formed (Ty-⨾ Ty-mult ty-ins) ty-env (St-cons 
   
 Preservation Op-pair (well-formed (Ty-⨾ Ty-pair ty-ins) ty-env (St-cons (St-cons ty-st ta) tb) ty-fr eq) = 
   well-formed ty-ins ty-env (St-cons ty-st (Ty-pair ta tb)) ty-fr eq
+
 Preservation Op-fst (well-formed (Ty-⨾ Ty-fst ty-ins) ty-env (St-cons ty-st (Ty-pair ta tb ⦃ eq' ⦄)) ty-fr eq) = 
   well-formed ty-ins ty-env (St-cons ty-st (subst (λ z → ⊢ _ == z) (M.proj₁ eq') ta)) ty-fr eq
+
 Preservation Op-snd (well-formed (Ty-⨾ Ty-snd ty-ins) ty-env (St-cons ty-st (Ty-pair ta tb ⦃ eq' ⦄)) ty-fr eq) = 
   well-formed ty-ins ty-env (St-cons ty-st (subst (λ z → ⊢ _ == z) (M.proj₂ eq') tb)) ty-fr eq
 

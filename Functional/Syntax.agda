@@ -15,6 +15,7 @@ infix 5 _<ₛ_
 infixl 30 _,,_
 
 {- Pre-syntax -}
+
 mutual
   data Instr : Set where
     -- Core language
@@ -34,6 +35,7 @@ mutual
     _⨾_ : Instr → Is → Is
 
 {- Machine configuration -}
+
 mutual
   data Val : Set where
     <> : Val
@@ -64,6 +66,7 @@ private variable
   m m' n n' : ℕ
 
 {- Operational semantics -}
+
 data [_↦_]∈_ : ∀{Γ A} → Var Γ A → Val → Env → Set where
   hd : ∀{Γ A} → [ v₀ {Γ} {A} ↦ v ]∈ (env ∷ v)
   tl : ∀{Γ A B}{x : Var Γ A} → [ x ↦ v ]∈ env → [ vs {B = B} x ↦ v ]∈ (env ∷ v')
@@ -161,11 +164,69 @@ data _⟶*_ : Config → Config → Set where
 private variable
   c c' c'' c₀ c₁ : Config
 
-{- _<_ relation -}
-
 _⋈_ : (c ⟶* c') → (c' ⟶* c'') → (c ⟶* c'')
 ε ⋈ σ' = σ'
 (a ∷ σ) ⋈ σ' = a ∷ (σ ⋈ σ')
+
+{- The apply-split lemma -}
+
+{-
+The apply-split lemma states that: if the machine pops one stack frame, then it must have been a return instruction somewhere.
+Formally:
+  Given a trace σ : ⟨ ins , env , stack , fr ∷< env' , stack' , ins' > ⟩ ⟶* ⟨ ret , env' , stack'' ∷ v , fr ⟩ 
+    where one call frame is popped, 
+    we can break the sequence σ into σ₁ ∷ Op-ret ∷ σ₂ such that
+    - dump , res is the final stack shape of σ₁ (before the return instruction)
+    - no step in σ₁ reduces the frame lower than fr ∷< env' , stack' , ins' >
+      (i.e. the return is the first instruction that pops the frame < env' , stack' , ins' >).
+
+This lemma is particually helpful in termination proofs, where we need to break down a trace like this in the apply case,
+to show that (by I.H.) the top closure's return value is in Halt.
+
+This lemma cannot be proven directly, the I.H is not strong enough at the apply case. 
+
+lemma :
+  (σ : ⟨ ins , env , stack , fr ∷< env' , stack' , ins' > ⟩ ⟶* ⟨ ret , env' , stack'' ∷ v , fr ⟩) →
+  Σ Env (λ dump → 
+  Σ Val (λ res →
+    ⟨ ins , env , stack , fr ∷< env' , stack' , ins' > ⟩ ⟶* ⟨ ret , env , dump ∷ res , fr ∷< env' , stack' , ins' > ⟩ × 
+    ⟨ ins' , env' , stack' ∷ res  , fr ⟩ ⟶* ⟨ ret , env' , stack'' ∷ v , fr ⟩))
+lemma (Op-app ∷ σ) = {! σ !}
+
+We need to generalize over fr, let it become some fr' smaller than the starting frames.
+
+lemma : 
+  (σ : ⟨ ins , env , stack , fr ∷< env'' , stack'' , ins'' > ⟩ ⟶* ⟨ ins' , env' , stack' , fr' ⟩) →
+  fr' <ᵣ (fr ∷< env'' , stack'' , ins'' >) →
+  Σ Env (λ dump → 
+  Σ Val (λ res →
+  Σ (⟨ ins , env , stack , fr ∷< env'' , stack'' , ins'' > ⟩ ⟶* ⟨ ret , env , dump ∷ res , fr ∷< env'' , stack'' , ins'' > ⟩)(λ σ₁ →
+  Σ (⟨ ins'' , env'' , stack'' ∷ res  , fr ⟩ ⟶* ⟨ ins' , env' , stack' , fr' ⟩))))
+lemma (Op-app ∷ σ) pf-fr with lemma σ (more pf-fr)
+... | _ , _ , δ₁ , δ₂  with lemma δ₂ pf-fr 
+... | dump , res , σ₁ , σ₂ = dump , res , Op-app ∷ (δ₁ ⋈ (Op-ret ∷ σ₁)) , σ₂
+
+Now we can use I.H. on the application case. Given
+  (Op-app ∷ σ) : ⟨ ins , env , stack ∷ < e , i > ∷ v , fr ∷< env'' , stack'' , ins'' > ⟩ ⟶* ⟨ ins' , env' , stack' , fr' ⟩,
+it is broken down into
+  ⟨ ins , env , stack ∷ < e , i > ∷ v , fr ∷< env'' , stack'' , ins'' > ⟩
+  -- Op-app -->
+  ⟨ i , e ∷ v , · , fr ∷< env'' , stack'' , ins'' > ∷< env , stack , ins > ⟩
+  -- δ₁ -->
+  ⟨ ret , e ∷ v , _ ∷ v' , fr ∷< env'' , stack'' , ins'' > ∷< env , stack , ins > ⟩
+  -- Op-ret -->
+  ⟨ ins , env , stack ∷ v' , fr ∷< env'' , stack'' , ins'' ⟩
+  -- δ₂ -->
+  ⟨ ins' , env' , stack' , fr' ⟩.
+We need to further apply the lemma on δ₂, breaking it down to σ₁ ∷ Op-ret ∷ σ₂,
+and return (δ₁ ∷ Op-ret ∷ σ₁) , σ₂ as the result.
+
+The final technique we need is the well-founded induction to apply I.H. on δ­₂,
+which is structurally smaller than σ.
+
+-}
+
+{- _<_ relation -}
 
 data _<ₛ_ : (σ : c ⟶* c₀) → (σ' : c' ⟶* c₀) → Set where
   one  : {a : c ⟶ c'}{σ : c' ⟶* c₀} → σ <ₛ (a ∷ σ)
@@ -202,6 +263,8 @@ dropᵣ : (fr fr' : Frame) → fr ≤ᵣ fr' → Frame
 dropᵣ fr fr' zero = ·
 dropᵣ fr (fr' ∷< env , stack , ins >) (more pf) = (dropᵣ fr fr' pf) ∷< env , stack , ins >
 
+{- Accessibility relation -}
+
 data Acc (σ : c ⟶* c') : Set where
   acc : (∀{c''}{σ' : c'' ⟶* c'} → σ' <ₛ σ → Acc σ') → Acc σ
 
@@ -211,6 +274,8 @@ data Acc (σ : c ⟶* c') : Set where
     aux : {σ : c ⟶* c'}{σ' : c'' ⟶* c'} → σ' <ₛ σ → Acc σ'
     aux one = <ₛ-Acc _
     aux (more pf) = aux pf
+
+{- A sequence never goes below a part of the call frame -}
 
 Not-below : (fr-base : Frame) → ⟨ ins , env , stack , fr ⟩ ⟶* ⟨ ins' , env' , stack' , fr' ⟩ → Set
 Not-below {fr = fr} fr-base ε = fr-base ≤ᵣ fr
@@ -241,6 +306,8 @@ Not-below-ret (Op-ret ∷ (_ ∷ σ)) refl (_ , fr< , nb) = absurd (≤ᵣ-cons-
   σ ⋈ (a ∷ (σ' ⋈ σ'')) ≡ (σ ⋈ (a ∷ σ')) ⋈ σ''
 ⋈-lem ε a σ' σ'' = refl
 ⋈-lem (a' ∷ σ) a σ' σ'' rewrite ⋈-lem σ a σ' σ'' = refl
+
+{- Proof of the generlaized lemma -}
 
 App-split-lemma : 
   (σ : ⟨ ins , env , stack , fr ∷< env'' , stack'' , ins'' > ⟩ ⟶* ⟨ ins' , env' , stack' , fr' ⟩) →
@@ -303,58 +370,6 @@ App-split-lemma (Op-fst ∷ σ) pf-fr (acc f) with App-split-lemma σ pf-fr (f o
 App-split-lemma (Op-snd ∷ σ) pf-fr (acc f) with App-split-lemma σ pf-fr (f one)
 ... | dump , res , σ₁ , σ₂ , pf< , refl , nb = dump , res , Op-snd ∷ σ₁ , σ₂ , more pf< , refl , zero , nb
 
-
-{-
-{-# TERMINATING #-}
-lemma : 
-  (σ : ⟨ ins , env , stack , fr ∷< env'' , stack'' , ins'' > ⟩ ⟶* ⟨ ins' , env' , stack' , fr' ⟩) →
-  fr' <ᵣ (fr ∷< env'' , stack'' , ins'' >) →
-  Σ Env (λ dump → 
-  Σ Val (λ res →
-  Σ (⟨ ins , env , stack , fr ∷< env'' , stack'' , ins'' > ⟩ ⟶* ⟨ ret , env , dump ∷ res , fr ∷< env'' , stack'' , ins'' > ⟩)(λ σ₁ →
-  Σ (⟨ ins'' , env'' , stack'' ∷ res  , fr ⟩ ⟶* ⟨ ins' , env' , stack' , fr' ⟩) (λ σ₂ →
-    σ₂ <ₛ σ ))))
-lemma ε (more pf-fr) = absurd (aux pf-fr)
-  where 
-    aux : fr ∷< env , stack , ins > <ᵣ fr → ⊥
-    aux (more pf) = aux (<ᵣ-pred pf)
-lemma (Op-pop ∷ σ) pf-fr with lemma σ pf-fr 
-... | dump , res , σ₁ , σ₂ , pf< = dump , res , Op-pop ∷ σ₁ , σ₂ , more pf<
-lemma (Op-swap ∷ σ) pf-fr with lemma σ pf-fr 
-... | dump , res , σ₁ , σ₂ , pf< = dump , res , Op-swap ∷ σ₁ , σ₂ , more pf<
-lemma (Op-app ∷ σ) pf-fr with lemma σ (more pf-fr)
-... | _ , _ , δ₁ , δ₂ , pf< with lemma δ₂ pf-fr   -- Here δ₂ is structually smaller than σ
-... | dump , res , σ₁ , σ₂ , pf<' = dump , res , Op-app ∷ (δ₁ ⋈ (Op-ret ∷ σ₁)) , σ₂ , <ₛ-trans pf<' (more pf<)
-lemma (Op-unit ∷ σ) pf-fr  with lemma σ pf-fr 
-... | dump , res , σ₁ , σ₂ , pf< = dump , res , Op-unit ∷ σ₁ , σ₂ , more pf<
-lemma (Op-pushc ∷ σ) pf-fr  with lemma σ pf-fr 
-... | dump , res , σ₁ , σ₂ , pf< = dump , res , Op-pushc ∷ σ₁ , σ₂ , more pf<
-lemma (Op-ret ∷ σ) pf-fr = _ , _ , ε , σ , one
-lemma (Op-var access ∷ σ) pf-fr with lemma σ pf-fr
-... | dump , res , σ₁ , σ₂ , pf< = dump , res , Op-var access ∷ σ₁ , σ₂ , more pf<
-lemma (Op-st access ∷ σ) pf-fr with lemma σ pf-fr
-... | dump , res , σ₁ , σ₂ , pf< = dump , res , Op-st access ∷ σ₁ , σ₂ , more pf<
--}
-
-{-
-lemma :
-  (σ : ⟨ ins , env , stack , fr ∷< env' , stack' , ins' > ⟩ ⟶* ⟨ ret , env' , stack'' ∷ v , fr ⟩) →
-  Σ Env (λ dump → 
-  Σ Val (λ res →
-    ⟨ ins , env , stack , fr ∷< env' , stack' , ins' > ⟩ ⟶* ⟨ ret , env , dump ∷ res , fr ∷< env' , stack' , ins' > ⟩ × 
-    ⟨ ins' , env' , stack' ∷ res  , fr ⟩ ⟶* ⟨ ret , env' , stack'' ∷ v , fr ⟩))
-lemma (Op-pop ∷ σ) with lemma σ 
-... | dump , res , σ₁ , σ₂ = dump , res , Op-pop ∷ σ₁ , σ₂
-lemma (Op-swap ∷ σ) with lemma σ 
-... | dump , res , σ₁ , σ₂ = dump , res , Op-swap ∷ σ₁ , σ₂
-lemma (Op-app ∷ σ) = {! σ  !}
-lemma (Op-unit ∷ σ) with lemma σ 
-... | dump , res , σ₁ , σ₂ = dump , res , Op-unit ∷ σ₁ , σ₂
-lemma (Op-pushc ∷ σ) with lemma σ 
-... | dump , res , σ₁ , σ₂ = dump , res , Op-pushc ∷ σ₁ , σ₂
-lemma (Op-ret ∷ σ) = _ , _ , ε , σ
--}
-
 Apply-split : 
   (σ : ⟨ ins , env , stack , fr ∷< env' , stack' , ins' > ⟩ ⟶* ⟨ ret , env' , stack'' ∷ v , fr ⟩) →
   Σ Env (λ dump → 
@@ -366,6 +381,8 @@ Apply-split :
   ))))
 Apply-split σ with App-split-lemma σ one (<ₛ-Acc σ)
 ... | dump , res , σ₁ , σ₂ , _ , eq , nb = dump , res , σ₁ , σ₂ , eq , nb
+
+{- Halting -}
 
 data _↓_ : Config → Val → Set where
   halt-frame : 
@@ -387,6 +404,8 @@ data _⇓₀_,_ : Config → Val → ℕ → Set where
 ⇓-count (op ∷ σ) = 
   let ind = ⇓-count σ in
     suc (π₁ ind) , step (π₂ ind) op
+
+{- Determinacy -}
 
 Determinacy : c ⟶ c' → c ⟶ c'' → c' ≡ c''
 Determinacy Op-pop Op-pop = refl
@@ -423,5 +442,3 @@ Determinacy-V (halt σ) (halt σ') = lem σ σ'
 step-red : c ⇓₀ v , (suc n) → c ⟶ c' → c' ⇓₀ v , n
 step-red (step finish op) op' rewrite Determinacy op' op = finish
 step-red (step (step σ a) op) op' rewrite Determinacy op' op = step σ a
-
-

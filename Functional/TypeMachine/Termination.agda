@@ -33,6 +33,9 @@ env ● (env' ∷ v) = (env ● env') ∷ v
 _⋈c_ : Is × Env → Is × Env × Env × Frame → Config
 (ins , stack) ⋈c (ins' , env' , stack' , fr') = ⟨ (ins ⟫ ins') , env' , (stack' ● stack) , fr' ⟩
 
+-- 2. Observation: the machine halts for the current call frame.
+-- Implemented as a trace that never goes below the current call frame.
+-- Some equalities are propositional, to avoid the green slime.
 record Halt-F (c : Config) : Set where
   constructor halt-f
   field
@@ -46,6 +49,7 @@ record Halt-F (c : Config) : Set where
 
 open Halt-F using (trace)
 
+-- Properties of the Halt-F observation.
 halt-cons : c ⟶ c' → c' ⇓ v → c ⇓ v
 halt-cons a (halt σ) = halt (a ∷ σ)
 
@@ -92,6 +96,7 @@ Halt-F-Preservation :
 Halt-F-Preservation (halt-f σ nb ⦃ refl ⦄  ⦃ refl ⦄ ) ty-ins ty-env ty-st = 
   Preservation⇓ (Partial-Halt σ nb zero) (well-formed ty-ins ty-env ty-st Frame-nil)
 
+-- 3. The biorthogonality construction
 T↑ : (Val → Set) → Is × Env × Env × Frame → Set
 T↑ P (ins , env , stack , fr) = ∀{v : Val} → P v → Halt-F ((ret , · ∷ v ) ⋈c (ins , env , stack , fr))
 
@@ -128,6 +133,7 @@ Halt-ty {A ⇒ B} {< env , ins >} (ty-clo , _) = ty-clo
 Halt-ty {Nat} {lit-n n} hv = Ty-nat
 Halt-ty {A ⊗ B} {v ,, v'} (hv , hv') = Ty-pair (Halt-ty hv) (Halt-ty hv')
 
+-- Helper function for showing a closure is in halt, given the fundamental lemma.
 Halt-clo : 
   (Γ ∷ A) ⊢ ins ∈ · ⟶ (Δ ∷ B) → 
   env ⊨ Γ → 
@@ -179,6 +185,19 @@ Halt-split-ty {Δ₂ = Δ₂ ∷ A} {s2 = s2 ∷ v} (Env-cons ta ty-st) refl ref
   with Halt-split-ty ty-st refl refl (suc-inj eq-len) h-st
 ... | ty-s1 , ty-s2 , h-s1 , h-s2 = 
   ty-s1 , Env-cons ta ty-s2 , h-s1 , (h-s2 , ha)
+
+{- 
+  The fundamental lemma states that:
+    well-typed machine with halting environment and stack halts at the current frame
+    and the resulting value is also in halt.
+
+  Implementation-wise, it is split into four mutual recursive definitions.
+    funda: the machine halts.
+    funda2: if the machine halts, then the resulting value is in halt.
+  It's easier to prove this way, since Agda can't keep track of some definitional equalities
+  of the traces.
+    funda-rec, funda2-rec: lemmas for the recursor case, doing induction over n : ℕ.
+-} 
 
 funda :
   Γ ⊢ ins ∈ Δ ⟶ (Δ' ∷ A) → 
@@ -234,6 +253,7 @@ funda (Ty-⨾ Ty-swap ty-ins) ty-env (Env-cons tb (Env-cons ta ty-st)) h-env ((h
   with funda ty-ins ty-env (Env-cons ta (Env-cons tb ty-st)) h-env ((h-st , hb) , ha)
 ... | halt-f σ nb = halt-f (Op-swap ∷ σ) (zero , nb)
 
+-- Application halts by the logical relation's definition.
 funda {fr = fr} (Ty-⨾ Ty-app ty-ins) ty-env (Env-cons ta (Env-cons (Ty-clo {ins = ins'} ty-env' ty-ins') ty-st)) h-env ((h-st , (ty-clo , hf)) , ha) with hf ha 
 ... | halt-TT , halt-B = halt-TT (λ hb → funda {fr = fr} ty-ins ty-env (Env-cons (Halt-ty hb) ty-st) h-env (h-st , hb))
 
@@ -253,6 +273,7 @@ funda (Ty-⨾ (Ty-st x) ty-ins) ty-env ty-st h-env h-st
     funda ty-ins ty-env (Env-cons (ty-[↦]∈ ty-st ty-x) ty-st) h-env (h-st , Halt-find-var h-st ty-x))
 ... | halt-f σ nb = halt-f (Op-st (π₂ (find-var x ty-st)) ∷ σ) (zero , nb)
 
+-- Goal: the closure just pushed is in halt. See Halt-clo.
 funda {fr = fr} (Ty-⨾ (Ty-pushc ty-ins') ty-ins) ty-env ty-st h-env h-st with 
     funda {fr = fr} ty-ins ty-env (Env-cons (Ty-clo ty-env ty-ins') ty-st) h-env (h-st , 
       Halt-clo ty-ins' ty-env 
@@ -260,6 +281,7 @@ funda {fr = fr} (Ty-⨾ (Ty-pushc ty-ins') ty-ins) ty-env ty-st h-env h-st with
         (λ ha hf → funda2 ty-ins' (Env-cons (Halt-ty ha) ty-env) Env-nil (h-env , ha) tt hf ) )
 ... | halt-f σ nb = halt-f (Op-pushc ∷ σ) (zero , nb)
 
+-- Similar to push-c, but more tedious due to stack-partition operations.
 funda {fr = fr} (Ty-⨾ (Ty-clo pf-c len< ty-ins') ty-ins) ty-env ty-st h-env h-st 
   with Halt-split pf-c ty-st h-st
 ... | s1 , s2 , refl , ty-s1 , ty-s2 , h-s1 , h-s2 , eq 
@@ -291,6 +313,7 @@ funda
 funda (Ty-⨾ Ty-add ty-ins) ty-env (Env-cons (Ty-nat {n = n}) (Env-cons (Ty-nat {n = m}) ty-st)) h-env ((h-st , tt) , tt) 
   with funda ty-ins ty-env (Env-cons Ty-nat ty-st) h-env (h-st , tt) 
 ... | halt-f σ nb = halt-f (Op-add m n ∷ σ) (zero , nb)
+
 funda (Ty-⨾ Ty-mult ty-ins) ty-env (Env-cons (Ty-nat {n = n}) (Env-cons (Ty-nat {n = m}) ty-st)) h-env ((h-st , tt) , tt)
   with funda ty-ins ty-env (Env-cons Ty-nat ty-st) h-env (h-st , tt) 
 ... | halt-f σ nb = halt-f (Op-mult m n ∷ σ) (zero , nb)
@@ -317,8 +340,10 @@ funda2 (Ty-⨾ Ty-pop ty-ins) ty-env (Env-cons _ ty-st) h-env (h-st , _) (halt-f
 funda2 (Ty-⨾ Ty-swap ty-ins) ty-env (Env-cons tb (Env-cons ta ty-st)) h-env ((h-st , ha) , hb) (halt-f (Op-swap ∷ σ) (fr< , nb)) =
   funda2 ty-ins ty-env (Env-cons ta (Env-cons tb ty-st)) h-env ((h-st , hb) , ha) (halt-f σ nb)
 
+-- Need the apply-split lemma to break down the halting sequence, and use I.H. 
+-- to show that the value returned from this application is in halt.
 funda2 {fr = fr} (Ty-⨾ Ty-app ty-ins) ty-env (Env-cons ta (Env-cons (Ty-clo {ins = ins'} ty-env' ty-ins') ty-st)) h-env ((h-st , ty-clo , hf) , ha) (halt-f (Op-app ∷ σ) (fr< , nb) ⦃ refl ⦄ ⦃ refl ⦄) 
-  with Apply-split σ  | hf ha
+  with Apply-split σ | hf ha
 ... | dump' , res' , σ₁ , σ₂ , eq , nb1 | halt-TT , halt-B = 
   let nbs = Not-below-⋈-inv {σ₁ = σ₁} {σ₂ = Op-ret ∷ σ₂} nb eq in
   let hf₁ = halt-f σ₁ nb1 in
@@ -455,20 +480,16 @@ funda2-rec
       
       nbs = Not-below-⋈-inv {σ₁ = δ₁} nb refl
 
+-- Termination, by the fundamental lemma.
+-- Every well-typed value is in halt.
 mutual
   Halting : ⊢ v ∈ A → Halt A v
   Halting Ty-unit = tt
-  Halting (Ty-clo ty-env ty-ins) = 
+  Halting {A = A ⇒ B} (Ty-clo {env = env} {ins = ins} ty-env ty-ins) = 
     let h-env = Halting-E ty-env in
-    Ty-clo ty-env ty-ins , 
-    λ ha → 
-      (λ asm → 
-        let ind1 = funda ty-ins (Env-cons (Halt-ty ha) ty-env) Env-nil (h-env , ha) tt in
-        let ind2 = funda2 ty-ins (Env-cons ((Halt-ty ha)) ty-env) Env-nil (h-env , ha) tt ind1 in 
-        halt-f 
-          (Op-app ∷ (trace-rw ind1 ⋈ (Op-ret ∷ trace-rw (asm ind2)))) 
-          (zero , Not-below-⋈ {σ = trace-rw ind1} (Not-below-pred (nb-rw ind1)) ((more (zero)) , nb-rw (asm ind2)))) , 
-      (λ hf → funda2 ty-ins (Env-cons (Halt-ty ha) ty-env) Env-nil (h-env , ha) tt hf)
+      Halt-clo ty-ins ty-env 
+        (λ ha → funda ty-ins (Env-cons (Halt-ty ha) ty-env) Env-nil (h-env , ha) tt) 
+        (λ ha hf → funda2 ty-ins (Env-cons ((Halt-ty ha)) ty-env) Env-nil (h-env , ha) tt hf)
   Halting Ty-nat = tt
   Halting (Ty-pair ta tb) = Halting ta , Halting tb
 
@@ -476,10 +497,12 @@ mutual
   Halting-E Env-nil = tt
   Halting-E (Env-cons ta ty-env) = Halting-E ty-env , Halting ta
 
+-- Well-formed configurations halt at the current frame.
 Termination-F : WF-Config A₀ c → Halt-F c
 Termination-F (well-formed ty-ins ty-env ty-st ty-fr) = 
   funda ty-ins ty-env ty-st (Halting-E ty-env) (Halting-E ty-st)
 
+-- Well-formed configurations halt, by induction on the number of frames.
 Termination : WF-Config A₀ c → (Σ Val (λ v → c ⇓ v))
 Termination (well-formed ty-ins ty-env ty-st ty-fr) = lem ty-ins ty-env ty-st ty-fr
   where
@@ -496,11 +519,17 @@ Termination (well-formed ty-ins ty-env ty-st ty-fr) = lem ty-ins ty-env ty-st ty
     ... | halt-f σ nb ⦃ refl ⦄ ⦃ refl ⦄ with lem ty-ins' ty-env' (Env-cons (Halt-F-Preservation (halt-f σ nb) ty-ins ty-env ty-st) ty-st') ty-fr
     ... | v , halt σ' =  v , (halt (σ ⋈ (Op-ret ∷ σ')))
 
+-- Using the termination proof as an evaluator
 eval : WF-Config A₀ c → Val
 eval wf = π₁ (Termination wf)
 
 exec : · ⊢ ins ∈ · ⟶ (Δ ∷ A) → (Σ Val (λ v → ⟨ ins , · , · , · ⟩ ⇓ v))
 exec ty-ins = Termination (well-formed ty-ins Env-nil Env-nil Frame-nil)
+
+-- Prototype of a more practical evaluator: 
+-- steps the machine using the type-safety theorem, and guarantees 
+-- termination with the termination proof.
+-- The typing judgement and the termination proof can be erased at runtime.
 
 Termination-n : WF-Config A₀ c → Σ Val (λ v → Σ ℕ (λ n → c ⇓₀ v , n))
 Termination-n wf with Termination wf
