@@ -78,6 +78,17 @@ mutual
     mult :
       {σ : Stack Γ Δ}{t t' : Tm Γ Nat} → 
       Instr Γ (σ ∷ t ∷ t') (σ ∷ M.mult t t')
+    pair : 
+      {σ : Stack Γ Δ}{t : Tm Γ A}{t' : Tm Γ B} → 
+      Instr Γ (σ ∷ t ∷ t') (σ ∷ M.pair t t')
+    fst : 
+      {σ : Stack Γ Δ}{t : Tm Γ (A ⊗ B)} → 
+     Instr Γ (σ ∷ t) (σ ∷ M.fst t)
+    snd : 
+      {σ : Stack Γ Δ}{t : Tm Γ (A ⊗ B)} → 
+      Instr Γ (σ ∷ t) (σ ∷ M.snd t)
+
+
 
   data Is (Γ : Con) : {Δ : Con} → Stack Γ Δ → Stack Γ Δ' → Set where
     ret : 
@@ -113,6 +124,9 @@ mutual
     S.rec iZ iS , T.Ty-rec tZ tS
   transform-i add = S.add , T.Ty-add
   transform-i mult = S.mult , T.Ty-mult
+  transform-i pair = S.pair , T.Ty-pair
+  transform-i fst = S.fst , T.Ty-fst
+  transform-i snd = S.snd , T.Ty-snd
 
   transform : 
     {σ : Stack Γ Δ}{σ' : Stack Γ Δ'} → 
@@ -150,5 +164,7 @@ compile t = aux t
     aux (Source.add t t') = (aux t) ⋈ (aux t') ⋈ (add ⨾ ret)
     aux (Source.mult t t') = (aux t) ⋈ (aux t') ⋈ (mult ⨾ ret)
     aux (Source.rec tZ tS t) = (aux t) ⋈ (rec (aux tZ) (aux tS) ⨾ ret)
-
+    aux (Source.pair t t') = (aux t) ⋈ (aux t') ⋈ (pair ⨾ ret)
+    aux (Source.fst t) = (aux t) ⋈ (fst ⨾ ret)
+    aux (Source.snd t) = (aux t) ⋈ (snd ⨾ ret)
 

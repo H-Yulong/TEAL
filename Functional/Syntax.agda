@@ -7,10 +7,12 @@ open import Relation.Binary.PropositionalEquality
 open import Basic
 open import Context
 
+infixl 20 _∷_
 infixr 20 _⨾_
 infixl 20 _∷<_,_,_>
 infix 5 _<ᵣ_
 infix 5 _<ₛ_
+infixl 30 _,,_
 
 {- Pre-syntax -}
 mutual
@@ -24,6 +26,8 @@ mutual
     lit : ℕ → Instr
     suc add mult : Instr
     rec : Is → Is → Instr 
+    -- Pairs
+    pair fst snd : Instr
 
   data Is : Set where
     ret : Is
@@ -35,6 +39,7 @@ mutual
     <> : Val
     lit-n : ℕ → Val
     <_,_> : Env → Is → Val
+    _,,_ : Val → Val → Val
 
   data Env : Set where
     · : Env
@@ -139,7 +144,15 @@ data _⟶_ : Config → Config → Set where
     (m n : ℕ) → 
     ⟨ mult ⨾ ins , env , stack ∷ lit-n m ∷ lit-n n , fr ⟩ ⟶ 
     ⟨ ins       , env , stack ∷ lit-n (m * n)     , fr ⟩ 
-
+  Op-pair : 
+    ⟨ pair ⨾ ins , env , stack ∷ v ∷ v'  , fr ⟩ ⟶
+    ⟨ ins        , env , stack ∷ v ,, v' , fr ⟩
+  Op-fst : 
+    ⟨ fst ⨾ ins , env , stack ∷ v ,, v' , fr ⟩ ⟶
+    ⟨ ins       , env , stack ∷ v       , fr ⟩
+  Op-snd : 
+    ⟨ snd ⨾ ins , env , stack ∷ v ,, v' , fr ⟩ ⟶
+    ⟨ ins       , env , stack ∷ v'      , fr ⟩
 
 data _⟶*_ : Config → Config → Set where
   ε : ∀{c} → c ⟶* c
@@ -283,6 +296,13 @@ App-split-lemma (Op-add m n ∷ σ) pf-fr (acc f) with App-split-lemma σ pf-fr 
 ... | dump , res , σ₁ , σ₂ , pf< , refl , nb = dump , res , Op-add m n ∷ σ₁ , σ₂ , more pf< , refl , zero , nb
 App-split-lemma (Op-mult m n ∷ σ) pf-fr (acc f) with App-split-lemma σ pf-fr (f one)
 ... | dump , res , σ₁ , σ₂ , pf< , refl , nb = dump , res , Op-mult m n ∷ σ₁ , σ₂ , more pf< , refl , zero , nb
+App-split-lemma (Op-pair ∷ σ) pf-fr (acc f) with App-split-lemma σ pf-fr (f one)
+... | dump , res , σ₁ , σ₂ , pf< , refl , nb = dump , res , Op-pair ∷ σ₁ , σ₂ , more pf< , refl , zero , nb
+App-split-lemma (Op-fst ∷ σ) pf-fr (acc f) with App-split-lemma σ pf-fr (f one)
+... | dump , res , σ₁ , σ₂ , pf< , refl , nb = dump , res , Op-fst ∷ σ₁ , σ₂ , more pf< , refl , zero , nb
+App-split-lemma (Op-snd ∷ σ) pf-fr (acc f) with App-split-lemma σ pf-fr (f one)
+... | dump , res , σ₁ , σ₂ , pf< , refl , nb = dump , res , Op-snd ∷ σ₁ , σ₂ , more pf< , refl , zero , nb
+
 
 {-
 {-# TERMINATING #-}
@@ -386,6 +406,9 @@ Determinacy Op-recZ Op-recZ = refl
 Determinacy (Op-recS n) (Op-recS n) = refl
 Determinacy (Op-add m n) (Op-add m n) = refl
 Determinacy (Op-mult m n) (Op-mult m n) = refl
+Determinacy Op-pair Op-pair = refl
+Determinacy Op-fst Op-fst = refl
+Determinacy Op-snd Op-snd = refl
 
 Determinacy-V : c ⇓ v → c ⇓ v' → v ≡ v'
 Determinacy-V (halt σ) (halt σ') = lem σ σ'

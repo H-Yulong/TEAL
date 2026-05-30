@@ -37,6 +37,9 @@ data Instr where
     Instr Γ (Δ'' ∷ Nat) (Δ'' ∷ A)
   add : Instr Γ (Δ ∷ Nat ∷ Nat) (Δ ∷ Nat)
   mult : Instr Γ (Δ ∷ Nat ∷ Nat) (Δ ∷ Nat)
+  pair : Instr Γ (Δ ∷ A ∷ B) (Δ ∷ A ⊗ B)
+  fst : Instr Γ (Δ ∷ A ⊗ B) (Δ ∷ A)
+  snd : Instr Γ (Δ ∷ A ⊗ B) (Δ ∷ B)
 
 data Is where
   ret : Is Γ (Δ ∷ A) (Δ ∷ A)
@@ -60,6 +63,9 @@ transform-i (rec inZ inS) with transform inZ | transform inS
 ... | inZ , tyZ | inS , tyS = S.rec inZ inS , Ty-rec tyZ tyS
 transform-i add = S.add , Ty-add
 transform-i mult = S.mult , Ty-mult
+transform-i pair = S.pair , Ty-pair
+transform-i fst = S.fst , Ty-fst
+transform-i snd = S.snd , Ty-snd
 
 
 transform ret = S.ret , Ty-ret
@@ -89,3 +95,6 @@ compile t = aux t
     aux (add t t') = (aux t) ⋈ (aux t') ⋈ (add ⨾ ret)
     aux (mult t t') = (aux t) ⋈ (aux t') ⋈ (mult ⨾ ret)
     aux (rec tZ tS t) = (aux t) ⋈ (rec (aux tZ) (aux tS) ⨾ ret)
+    aux (pair t t') = (aux t) ⋈ (aux t') ⋈ (pair ⨾ ret)
+    aux (fst t) = (aux t) ⋈ (fst ⨾ ret)
+    aux (snd t) = (aux t) ⋈ (snd ⨾ ret)

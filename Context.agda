@@ -5,11 +5,13 @@ open import Data.Nat
 
 infixr 30 _⇒_
 infixl 20 _∷_
+infixl 30 _⊗_
 
 data Ty : Set where
   One : Ty
   Nat : Ty
   _⇒_ : Ty → Ty → Ty
+  _⊗_ : Ty → Ty → Ty
 
 data Con : Set where
   · : Con

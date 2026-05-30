@@ -18,6 +18,9 @@ data Tm : Con → Ty → Set where
   suc : ∀{Γ} → Tm Γ Nat → Tm Γ Nat
   add mult : ∀{Γ} → Tm Γ Nat → Tm Γ Nat → Tm Γ Nat
   rec : ∀{Γ A} → Tm Γ A → Tm (Γ ∷ Nat ∷ A) A → Tm Γ Nat → Tm Γ A
+  pair : ∀{Γ A B} → Tm Γ A → Tm Γ B → Tm Γ (A ⊗ B)
+  fst : ∀{Γ A B} → Tm Γ (A ⊗ B) → Tm Γ A
+  snd : ∀{Γ A B} → Tm Γ (A ⊗ B) → Tm Γ B
 
 {- Renaming and substitution -}
 ren : ∀{Γ Δ A} → Tm Γ A → Ren Γ Δ → Tm Δ A
@@ -30,6 +33,9 @@ ren (suc t) ρ = suc (ren t ρ)
 ren (add t t') ρ = add (ren t ρ) (ren t' ρ)
 ren (mult t t') ρ = mult (ren t ρ) (ren t' ρ)
 ren (rec tZ tS t) ρ = rec (ren tZ ρ) (ren tS (ext (ext ρ))) (ren t ρ)
+ren (pair t t') ρ = pair (ren t ρ) (ren t' ρ)
+ren (fst t) ρ = fst (ren t ρ)
+ren (snd t) ρ = snd (ren t ρ)
 
 Sub : Con → Con → Set
 Sub Γ Δ = ∀{A} → Var Δ A → Tm Γ A
@@ -48,6 +54,9 @@ suc t [ σ ] = suc (t [ σ ])
 add t t' [ σ ] = add (t [ σ ]) (t' [ σ ])
 mult t t' [ σ ] = mult (t [ σ ]) (t' [ σ ])
 rec tZ tS t [ σ ] = rec (tZ [ σ ]) (tS [ ↑ (↑ σ) ]) (t [ σ ])
+pair t t' [ σ ] = pair (t [ σ ]) (t' [ σ ])
+fst t [ σ ] = fst (t [ σ ])
+snd t [ σ ] = snd (t [ σ ])
 
 ✧ : ∀{Γ} → Sub Γ Γ
 ✧ x = var x
@@ -79,6 +88,13 @@ data _≡β_ : {Γ : Con} {A : Ty} → (t t' : Tm Γ A) → Set where
     ∀{Γ A}{tZ : Tm Γ A}{tS : Tm (Γ ∷ Nat ∷ A) A}{t : Tm Γ Nat} → 
     rec tZ tS (suc t) ≡β tS [ ✧ ▻ t ▻ rec tZ tS t ]
   suc : ∀{Γ n} → _≡β_ {Γ} (suc (lit n)) (lit (suc n))
+  -- pairs
+  fst : 
+    ∀{Γ A B}{t : Tm Γ A}{t' : Tm Γ B} → 
+    fst (pair t t') ≡β t
+  snd : 
+    ∀{Γ A B}{t : Tm Γ A}{t' : Tm Γ B} → 
+    snd (pair t t') ≡β t'
   -- congruence rules
   cong-lam : 
     ∀{Γ A B}{t t' : Tm (Γ ∷ A) B} → 
@@ -99,4 +115,12 @@ data _≡β_ : {Γ : Con} {A : Ty} → (t t' : Tm Γ A) → Set where
     ∀{Γ A}{tZ tZ' : Tm Γ A}{tS tS' : Tm (Γ ∷ Nat ∷ A) A}{t t' : Tm Γ Nat} →
     tZ ≡β tZ' → tS ≡β tS' → t ≡β t' → 
     rec tZ tS t ≡β rec tZ' tS' t'
-
+  cong-pair : 
+    ∀{Γ A B}{s s' : Tm Γ A}{t t' : Tm Γ B} → 
+    s ≡β s' → t ≡β t' → pair s t ≡β pair s' t'
+  cong-fst : 
+    ∀{Γ A B}{t t' : Tm Γ (A ⊗ B)} → 
+    t ≡β t' → fst t ≡β fst t'
+  cong-snd : 
+    ∀{Γ A B}{t t' : Tm Γ (A ⊗ B)} → 
+    t ≡β t' → snd t ≡β snd t'

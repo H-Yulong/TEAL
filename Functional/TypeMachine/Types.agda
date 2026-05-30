@@ -45,6 +45,9 @@ mutual
       Γ ⊢ᵢ rec ins ins' ∈ Δ'' ∷ Nat ⟶ Δ'' ∷ A
     Ty-add : Γ ⊢ᵢ add ∈ Δ ∷ Nat ∷ Nat ⟶ Δ ∷ Nat
     Ty-mult : Γ ⊢ᵢ mult ∈ Δ ∷ Nat ∷ Nat ⟶ Δ ∷ Nat
+    Ty-pair : Γ ⊢ᵢ pair ∈ Δ ∷ A ∷ B ⟶ Δ ∷ A ⊗ B
+    Ty-fst : Γ ⊢ᵢ fst ∈ Δ ∷ A ⊗ B ⟶ Δ ∷ A
+    Ty-snd : Γ ⊢ᵢ snd ∈ Δ ∷ A ⊗ B ⟶ Δ ∷ B
 
   data _⊢_∈_⟶_ : Con → Is → Con → Con → Set where
     Ty-ret : Γ ⊢ ret ∈ (Δ ∷ A) ⟶ (Δ ∷ A)
@@ -60,6 +63,7 @@ mutual
     Ty-clo : 
       env ⊨ Γ → (Γ ∷ A) ⊢ ins ∈ · ⟶ (Δ ∷ B) →  
       ⊢ < env , ins > ∈ A ⇒ B
+    Ty-pair : ⊢ v ∈ A → ⊢ v' ∈ B → ⊢ (v ,, v') ∈ A ⊗ B
 
   data _⊨_ : Env → Con → Set where
     Env-nil : · ⊨ ·
@@ -152,6 +156,12 @@ Preservation (Op-add m n) (well-formed (Ty-⨾ Ty-add ty-ins) ty-env (Env-cons T
   well-formed ty-ins ty-env (Env-cons Ty-nat ty-st) ty-fr
 Preservation (Op-mult m n) (well-formed (Ty-⨾ Ty-mult ty-ins) ty-env (Env-cons Ty-nat (Env-cons Ty-nat ty-st)) ty-fr) = 
   well-formed ty-ins ty-env (Env-cons Ty-nat ty-st) ty-fr
+Preservation Op-pair (well-formed (Ty-⨾ Ty-pair ty-ins) ty-env (Env-cons ta (Env-cons tb ty-st)) ty-fr) = 
+  well-formed ty-ins ty-env (Env-cons (Ty-pair tb ta) ty-st) ty-fr
+Preservation Op-fst (well-formed (Ty-⨾ Ty-fst ty-ins) ty-env (Env-cons (Ty-pair ta tb) ty-st) ty-fr) = 
+  well-formed ty-ins ty-env (Env-cons ta ty-st) ty-fr
+Preservation Op-snd (well-formed (Ty-⨾ Ty-snd ty-ins) ty-env (Env-cons (Ty-pair ta tb) ty-st) ty-fr) = 
+  well-formed ty-ins ty-env (Env-cons tb ty-st) ty-fr
 
 Progress : WF-Config A₀ c → (Σ Val (λ v → c ⇓₀ v , zero)) ⊎ (Σ Config (λ c' → c ⟶ c'))
 Progress {c = ⟨ ins , env , stack ∷ v , · ⟩} (well-formed Ty-ret ty-env (Env-cons _ ty-st) Frame-nil) = 
@@ -187,7 +197,12 @@ Progress (well-formed (Ty-⨾ Ty-add ty-ins) ty-env (Env-cons (Ty-nat {n = n}) (
   inj₂ (_ , Op-add m n)
 Progress (well-formed (Ty-⨾ Ty-mult ty-ins) ty-env (Env-cons (Ty-nat {n = n}) (Env-cons (Ty-nat {n = m}) ty-st)) ty-fr) = 
   inj₂ (_ , Op-mult m n)
-
+Progress (well-formed (Ty-⨾ Ty-pair ty-ins) ty-env (Env-cons ta (Env-cons tb ty-st)) ty-fr) = 
+  inj₂ (_ , Op-pair)
+Progress (well-formed (Ty-⨾ Ty-fst ty-ins) ty-env (Env-cons (Ty-pair ta tb) ty-st) ty-fr) = 
+  inj₂ (_ , Op-fst)
+Progress (well-formed (Ty-⨾ Ty-snd ty-ins) ty-env (Env-cons (Ty-pair ta tb) ty-st) ty-fr) = 
+  inj₂ (_ , Op-snd)
 
 Preservation* : c ⟶* c' → WF-Config A₀ c → WF-Config A₀ c'
 Preservation* ε wf = wf

@@ -14,6 +14,7 @@ import Functional.Calculus.Syntax as S
 ⟦ One ⟧T = ⊤
 ⟦ Nat ⟧T = ℕ
 ⟦ A ⇒ B ⟧T = ⟦ A ⟧T → ⟦ B ⟧T
+⟦ A ⊗ B ⟧T = ⟦ A ⟧T × ⟦ B ⟧T
 
 ⟦_⟧Γ : Con → Set
 ⟦ · ⟧Γ = ⊤
@@ -74,6 +75,25 @@ mult (~λ t) (~λ t') = ~λ (λ γ → (t γ) * (t' γ))
 rec : ∀{Γ A} → Tm Γ A → Tm (Γ ∷ Nat ∷ A) A → Tm Γ Nat → Tm Γ A
 rec (~λ tZ) (~λ tS) (~λ t) = ~λ (λ γ → ~rec (tZ γ) (λ x r → tS ((γ , x) , r)) (t γ))
 
+pair : ∀{Γ A B} → Tm Γ A → Tm Γ B → Tm Γ (A ⊗ B)
+pair (~λ t) (~λ t') = ~λ (λ γ → t γ , t' γ)
+
+fst : ∀{Γ A B} → Tm Γ (A ⊗ B) → Tm Γ A
+fst (~λ t) = ~λ (λ γ → π₁ (t γ))
+
+snd : ∀{Γ A B} → Tm Γ (A ⊗ B) → Tm Γ B
+snd (~λ t) = ~λ (λ γ → π₂ (t γ))
+
+proj₁ : 
+  ∀{Γ A B}{t : Tm Γ (A ⊗ B)}{t₁ : Tm Γ A}{t₂ : Tm Γ B} → 
+  pair t₁ t₂ ≡ t → t₁ ≡ fst t
+proj₁ refl = refl
+
+proj₂ : 
+  ∀{Γ A B}{t : Tm Γ (A ⊗ B)}{t₁ : Tm Γ A}{t₂ : Tm Γ B} → 
+  pair t₁ t₂ ≡ t → t₂ ≡ snd t
+proj₂ refl = refl
+
 Sub : Con → Con → Set
 Sub Γ Δ = ⟦ Γ ⟧Γ → ⟦ Δ ⟧Γ
 
@@ -114,3 +134,6 @@ compile (S.suc t) = suc (compile t)
 compile (S.add t t') = add (compile t) (compile t')
 compile (S.mult t t') = mult (compile t) (compile t')
 compile (S.rec tZ tS t) = rec (compile tZ) (compile tS) (compile t)
+compile (S.pair t t') = pair (compile t) (compile t')
+compile (S.fst t) = fst (compile t)
+compile (S.snd t) = snd (compile t)

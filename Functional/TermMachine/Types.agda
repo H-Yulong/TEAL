@@ -112,6 +112,15 @@ mutual
     Ty-mult :
       {σ : Stack Γ Δ}{t t' : Tm Γ Nat} → 
       Γ ⊢ᵢ mult ∈ σ ∷ t ∷ t' ⟶ σ ∷ M.mult t t'
+    Ty-pair : 
+      {σ : Stack Γ Δ}{t : Tm Γ A}{t' : Tm Γ B} → 
+      Γ ⊢ᵢ pair ∈ σ ∷ t ∷ t' ⟶ σ ∷ M.pair t t'
+    Ty-fst : 
+      {σ : Stack Γ Δ}{t : Tm Γ (A ⊗ B)} → 
+      Γ ⊢ᵢ fst ∈ σ ∷ t ⟶ σ ∷ M.fst t
+    Ty-snd : 
+      {σ : Stack Γ Δ}{t : Tm Γ (A ⊗ B)} → 
+      Γ ⊢ᵢ snd ∈ σ ∷ t ⟶ σ ∷ M.snd t
 
   data _⊢_∈_⟶_ : (Γ : Con) → Is → Stack Γ Δ → Stack Γ Δ' → Set where
     Ty-ret : 
@@ -135,6 +144,11 @@ mutual
       (Γ ∷ A) ⊢ ins ∈ · ⟶ σ ∷ t →
       ⦃ M.lam (t [ ↑ γ ]) ≡ body ⦄ →   
       ⊢ < env , ins > == body
+    Ty-pair : 
+      {t : Tm · A}{t' : Tm · B}{body : Tm · (A ⊗ B)} →  
+      ⊢ v == t → ⊢ v' == t' → 
+      ⦃ M.pair t t' ≡ body ⦄ → 
+      ⊢ (v ,, v') == body
 
   data _⊨_as_ : Env → (Γ : Con) → Sub · Γ → Set where
     Env-nil : · ⊨ · as ⊘
@@ -203,6 +217,9 @@ mutual
   transform-i (Ty-rec iZ iS) = T.Ty-rec (transform iZ) (transform iS)
   transform-i Ty-add = T.Ty-add
   transform-i Ty-mult = T.Ty-mult
+  transform-i Ty-pair = T.Ty-pair
+  transform-i Ty-fst = T.Ty-fst
+  transform-i Ty-snd = T.Ty-snd
 
   transform : 
     {σ : Stack Γ Δ}{σ' : Stack Γ Δ'}{ins : Is} → 
@@ -215,6 +232,7 @@ mutual
   transform-v Ty-unit = T.Ty-unit
   transform-v Ty-nat = T.Ty-nat
   transform-v (Ty-clo env ins) = T.Ty-clo (transform-env env) (transform ins)
+  transform-v (Ty-pair v v') = T.Ty-pair (transform-v v) (transform-v v')
 
   transform-env : {γ : Sub · Γ} → env ⊨ Γ as γ → env T.⊨ Γ
   transform-env Env-nil = T.Env-nil
@@ -333,6 +351,12 @@ Progress (well-formed (Ty-⨾ Ty-add ty-ins) ty-env (St-cons (St-cons ty-st Ty-n
   inj₂ (_ , Op-add _ _)
 Progress (well-formed (Ty-⨾ Ty-mult ty-ins) ty-env (St-cons (St-cons ty-st Ty-nat) Ty-nat) ty-fr eq) = 
   inj₂ (_ , Op-mult _ _)
+Progress (well-formed (Ty-⨾ Ty-pair ty-ins) ty-env (St-cons (St-cons ty-st ta) tb) ty-fr eq) = 
+  inj₂ (_ , Op-pair)
+Progress (well-formed (Ty-⨾ Ty-fst ty-ins) ty-env (St-cons ty-st (Ty-pair ta tb)) ty-fr eq) = 
+  inj₂ (_ , Op-fst)
+Progress (well-formed (Ty-⨾ Ty-snd ty-ins) ty-env (St-cons ty-st (Ty-pair ta tb)) ty-fr eq) = 
+  inj₂ (_ , Op-snd)
 
 ~λ≡ : {t t' : Tm · A} → t ≡ t' → t .~fun tt ≡ t' .~fun tt
 ~λ≡ refl = refl
@@ -415,6 +439,13 @@ Preservation (Op-add m n) (well-formed (Ty-⨾ Ty-add ty-ins) ty-env (St-cons (S
 
 Preservation (Op-mult m n) (well-formed (Ty-⨾ Ty-mult ty-ins) ty-env (St-cons (St-cons ty-st (Ty-nat {t = t} ⦃ eq1 ⦄)) (Ty-nat ⦃ eq2 ⦄)) ty-fr eq) =
    well-formed ty-ins ty-env (St-cons ty-st (Ty-nat ⦃ ~λ-ext (cong₂ _*_ (~λ≡ eq1) (~λ≡ eq2)) ⦄)) ty-fr eq
+  
+Preservation Op-pair (well-formed (Ty-⨾ Ty-pair ty-ins) ty-env (St-cons (St-cons ty-st ta) tb) ty-fr eq) = 
+  well-formed ty-ins ty-env (St-cons ty-st (Ty-pair ta tb)) ty-fr eq
+Preservation Op-fst (well-formed (Ty-⨾ Ty-fst ty-ins) ty-env (St-cons ty-st (Ty-pair ta tb ⦃ eq' ⦄)) ty-fr eq) = 
+  well-formed ty-ins ty-env (St-cons ty-st (subst (λ z → ⊢ _ == z) (M.proj₁ eq') ta)) ty-fr eq
+Preservation Op-snd (well-formed (Ty-⨾ Ty-snd ty-ins) ty-env (St-cons ty-st (Ty-pair ta tb ⦃ eq' ⦄)) ty-fr eq) = 
+  well-formed ty-ins ty-env (St-cons ty-st (subst (λ z → ⊢ _ == z) (M.proj₂ eq') tb)) ty-fr eq
 
 Preservation* : c ⟶* c' → WF-Config A₀ c → WF-Config A₀ c'
 Preservation* ε wf = wf
@@ -447,6 +478,9 @@ Preservation-Exp Op-recZ (well-formed (Ty-⨾ (Ty-rec {tZ = tZ} {tS = tS} ty-Z t
 Preservation-Exp (Op-recS n) (well-formed (Ty-⨾ (Ty-rec {tZ = tZ} {tS = tS} {n = tn} ty-Z ty-S) ty-ins) ty-env (St-cons ty-st (Ty-nat {n = suc n} {t = t} ⦃ eq-n ⦄)) ty-fr eq) = refl
 Preservation-Exp (Op-add m n) (well-formed (Ty-⨾ Ty-add ty-ins) ty-env (St-cons (St-cons ty-st (Ty-nat {t = t} ⦃ eq1 ⦄)) (Ty-nat ⦃ eq2 ⦄)) ty-fr eq) = refl
 Preservation-Exp (Op-mult m n) (well-formed (Ty-⨾ Ty-mult ty-ins) ty-env (St-cons (St-cons ty-st (Ty-nat {t = t} ⦃ eq1 ⦄)) (Ty-nat ⦃ eq2 ⦄)) ty-fr eq) = refl
+Preservation-Exp Op-pair (well-formed (Ty-⨾ Ty-pair ty-ins) ty-env (St-cons (St-cons ty-st ta) tb) ty-fr eq) = refl
+Preservation-Exp Op-fst (well-formed (Ty-⨾ Ty-fst ty-ins) ty-env (St-cons ty-st (Ty-pair ta tb ⦃ eq' ⦄)) ty-fr eq) = refl
+Preservation-Exp Op-snd (well-formed (Ty-⨾ Ty-snd ty-ins) ty-env (St-cons ty-st (Ty-pair ta tb ⦃ eq' ⦄)) ty-fr eq) = refl
 
 Partial-Correctness : c ⇓ v → (wf : WF-Config A₀ c) → ⊢ v == Exp wf
 Partial-Correctness (halt σ) wf = aux σ wf
@@ -464,5 +498,3 @@ Total-Correctness-Prog :
   {σ : Stack · Δ}{t : Tm · A} → 
   · ⊢ ins ∈ · ⟶ (σ ∷ t) → Σ Val (λ v → ⟨ ins , · , · , · ⟩ ⇓ v × ⊢ v == t)
 Total-Correctness-Prog ty-ins = Total-Correctness (well-formed ty-ins Env-nil St-nil Frame-nil refl)
-
-

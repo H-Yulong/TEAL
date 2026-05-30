@@ -139,3 +139,34 @@ module Factorial2 where
 
   run : Exec target
   run = exec target
+
+module Fib where
+  open import Functional.TermMachine.Intrinsic
+  open import Functional.Calculus.Syntax
+  import Functional.TermMachine.Types as T
+  import Functional.Calculus.Shallow as M
+
+  source : Tm · (Nat ⇒ Nat)
+  source = lam ( -- fib x = 
+    rec 
+      (lit 0) -- if x = 0 then 0
+      (snd -- else x = suc y, compute (fib y, fib (y + 1))
+        (rec 
+          (pair (lit 0) (lit 1)) -- zero case: (1, 1)
+          (pair (snd (var v₀)) (add (fst (var v₀)) (snd (var v₀)))) -- recursive case: (fib (y + 1), fib y + fib (y + 1))
+          (var v₁)
+        )
+      ) 
+      (var v₀)
+    )
+  
+  fib : ℕ → Tm · Nat
+  fib n = app source (lit n)
+
+  target : Is · T.· (T.· T.∷ M.lit 55)
+  target = compile (fib 10)
+
+  run : Exec target
+  run = exec target
+
+-- open import Functional.TermMachine.Intrinsic
