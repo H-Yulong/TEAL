@@ -68,7 +68,7 @@ mutual
       Γ ⊢ᵢ swap ∈ σ ∷ t ∷ t' ⟶ σ ∷ t' ∷ t
     Ty-app : 
       {σ : Stack Γ Δ}{t : Tm Γ (A ⇒ B)}{t' : Tm Γ A} → 
-      Γ ⊢ᵢ app ∈ σ ∷ t ∷ t' ⟶ σ ∷ (M.app t t')
+      Γ ⊢ᵢ app ∈ σ ∷ t ∷ t' ⟶ σ ∷ (M.app t t') 
     Ty-unit : 
       {σ : Stack Γ Δ} → 
       Γ ⊢ᵢ unit ∈ σ ⟶ σ ∷ M.unit

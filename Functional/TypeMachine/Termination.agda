@@ -26,12 +26,8 @@ _⟫_ : Is → Is → Is
 ret ⟫ ins' = ins'
 (i ⨾ ins) ⟫ ins' = i ⨾ (ins ⟫ ins')
 
-_●_ : Env → Env → Env
-env ● · = env
-env ● (env' ∷ v) = (env ● env') ∷ v
-
 _⋈c_ : Is × Env → Is × Env × Env × Frame → Config
-(ins , stack) ⋈c (ins' , env' , stack' , fr') = ⟨ (ins ⟫ ins') , env' , (stack' ● stack) , fr' ⟩
+(ins , stack) ⋈c (ins' , env' , stack' , fr') = ⟨ (ins ⟫ ins') , env' , (stack' ⋈e stack) , fr' ⟩
 
 -- 2. Observation: the machine halts for the current call frame.
 -- Implemented as a trace that never goes below the current call frame.

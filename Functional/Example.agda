@@ -169,4 +169,4 @@ module Fib where
   run : Exec target
   run = exec target
 
--- open import Functional.TermMachine.Intrinsic
+open import Functional.TermMachine.Intrinsic
