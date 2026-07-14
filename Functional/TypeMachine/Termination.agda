@@ -101,17 +101,16 @@ T↓ Q (ins , stack) = ∀{c} → Q c → Halt-F ((ins , stack) ⋈c c)
 
 -- Halting set of values
 Halt : (A : Ty) → (v : Val)  → Set
+Halt-FC : Ty → Is → Env → Env → Frame → Set
+
 Halt One <> = ⊤
 Halt Nat (lit-n n) = ⊤
 Halt (A ⇒ B) < env , ins > = 
-  ⊢ < env , ins > ∈ (A ⇒ B) ×   -- the closure is well-typed, and
-  (∀{v} → Halt A v →              -- for all values v in Halt A: 
-    -- 1. applying the closure to v halts in every evaluation context
-    T↓ (T↑ (Halt B)) ((app ⨾ ret) , (· ∷ < env , ins > ∷ v)) ×
-    -- 2. if the closure's code halts, its result is in Halt B
-    ({fr : Frame} → (hf : Halt-F ⟨ ins , (env ∷ v) , · , fr ⟩) → Halt B (Halt-F.res hf)))
+  ⊢ < env , ins > ∈ (A ⇒ B) × (∀{v fr} → Halt A v → Halt-FC B ins (env ∷ v) · fr)
 Halt (A ⊗ B) (v ,, v') = Halt A v × Halt B v'
 Halt _ _ = ⊥
+
+Halt-FC A ins env stack fr = Σ (Halt-F ⟨ ins , env , stack , fr ⟩) (λ hf → Halt A (Halt-F.res hf))
 
 Halt-E : (Γ : Con) → Env → Set
 Halt-E · · = ⊤
@@ -120,33 +119,14 @@ Halt-E (Γ ∷ A) · = ⊥
 Halt-E (Γ ∷ A) (env ∷ v) = Halt-E Γ env × Halt A v
 
 Halt-find-var : {x : Var Γ A} → Halt-E Γ env → [ x ↦ v ]∈ env → Halt A v
-Halt-find-var {x = v₀} (h-env , hv) hd = hv
-Halt-find-var {x = vs x} (h-env , hv) (tl pf) = Halt-find-var h-env pf
+Halt-find-var {x = v₀} (henv , hv) hd = hv
+Halt-find-var {x = vs x} (henv , hv) (tl pf) = Halt-find-var henv pf
 
 Halt-ty : {v : Val} → Halt A v → ⊢ v ∈ A
 Halt-ty {One} {<>} hv = Ty-unit
 Halt-ty {A ⇒ B} {< env , ins >} (ty-clo , _) = ty-clo
 Halt-ty {Nat} {lit-n n} hv = Ty-nat
 Halt-ty {A ⊗ B} {v ,, v'} (hv , hv') = Ty-pair (Halt-ty hv) (Halt-ty hv')
-
--- Helper function for showing a closure is in halt, given the fundamental lemma.
-Halt-clo : 
-  (Γ ∷ A) ⊢ ins ∈ · ⟶ (Δ ∷ B) → 
-  env ⊨ Γ → 
-  (∀{fr v} → Halt A v → Halt-F ⟨ ins , env ∷ v , · , fr ⟩) → 
-  (∀{fr v} → Halt A v → (hf : Halt-F ⟨ ins , env ∷ v , · , fr ⟩) → Halt B (Halt-F.res hf)) →
-  Halt (A ⇒ B) < env , ins > 
-Halt-clo ty-env ty-ins ind1 ind2 = 
-  Ty-clo ty-ins ty-env , 
-  λ ha → 
-    (λ asm → 
-      let h1 = ind1 ha in
-      let h2 = ind2 ha h1 in
-      halt-f 
-        (Op-app ∷ (trace-rw h1 ⋈ (Op-ret ∷ trace-rw (asm h2)))) 
-        (zero , (Not-below-⋈ {σ = trace-rw (ind1 ha)} (Not-below-pred (nb-rw h1)) ((more zero) , nb-rw (asm h2))))
-      ) , 
-    (λ hf → ind2 ha hf)
 
 Halt-split : ∀{Δ₁ Δ₂} → 
   Δ ≡ (Δ₁ ++ Δ₂) → 
@@ -160,40 +140,19 @@ Halt-split : ∀{Δ₁ Δ₂} →
     Halt-E Δ₂ s2 ×
     len-E s2 ≡ len-C Δ₂
   ))
-Halt-split {stack = stack} {Δ₂ = ·} refl ty-st h-st = 
-  stack , · , refl , ty-st , Env-nil , h-st , tt , refl
-Halt-split {stack = stack ∷ v} {Δ₂ = Δ₂ ∷ A} refl (Env-cons ta ty-st) (h-st , ha)
- with Halt-split {stack = stack} {Δ₂ = Δ₂} refl ty-st h-st 
+Halt-split {stack = stack} {Δ₂ = ·} refl ty-st hst = 
+  stack , · , refl , ty-st , Env-nil , hst , tt , refl
+Halt-split {stack = stack ∷ v} {Δ₂ = Δ₂ ∷ A} refl (Env-cons ta ty-st) (hst , ha)
+ with Halt-split {stack = stack} {Δ₂ = Δ₂} refl ty-st hst 
 ... | s1 , s2 , refl , ty-s1 , ty-s2 , h-s1 , h-s2 , eq = 
   s1 , s2 ∷ v , refl , ty-s1 , Env-cons ta ty-s2 , h-s1 , (h-s2 , ha) , cong suc eq
 
-Halt-split-ty : 
-  ∀{Δ₁ Δ₂ s1 s2} → 
-  stack ⊨ Δ →
-  Δ ≡ (Δ₁ ++ Δ₂) →  
-  stack ≡ (s1 ⋈e s2) → 
-  len-C Δ₂ ≡ len-E s2 → 
-  Halt-E Δ stack → 
-  s1 ⊨ Δ₁ × s2 ⊨ Δ₂ × Halt-E Δ₁ s1 × Halt-E Δ₂ s2
-Halt-split-ty {Δ₂ = ·} {s2 = ·} ty-st refl refl refl h-st = 
-  ty-st , Env-nil , h-st , tt
-Halt-split-ty {Δ₂ = Δ₂ ∷ A} {s2 = s2 ∷ v} (Env-cons ta ty-st) refl refl eq-len (h-st , ha) 
-  with Halt-split-ty ty-st refl refl (suc-inj eq-len) h-st
-... | ty-s1 , ty-s2 , h-s1 , h-s2 = 
-  ty-s1 , Env-cons ta ty-s2 , h-s1 , (h-s2 , ha)
-
-{- 
-  The fundamental lemma states that:
-    well-typed machine with halting environment and stack halts at the current frame
-    and the resulting value is also in halt.
-
-  Implementation-wise, it is split into four mutual recursive definitions.
-    funda: the machine halts.
-    funda2: if the machine halts, then the resulting value is in halt.
-  It's easier to prove this way, since Agda can't keep track of some definitional equalities
-  of the traces.
-    funda-rec, funda2-rec: lemmas for the recursor case, doing induction over n : ℕ.
--} 
+Halt-clo : 
+  (Γ ∷ A) ⊢ ins ∈ · ⟶ (Δ ∷ B) → 
+  env ⊨ Γ → 
+  (∀{fr v} → Halt A v → Halt-FC B ins (env ∷ v) · fr) → 
+  Halt (A ⇒ B) < env , ins > 
+Halt-clo ty-ins ty-env asm = (Ty-clo ty-env ty-ins) , asm
 
 funda :
   Γ ⊢ ins ∈ Δ ⟶ (Δ' ∷ A) → 
@@ -201,16 +160,7 @@ funda :
   stack ⊨ Δ → 
   Halt-E Γ env → 
   Halt-E Δ stack →
-  Halt-F ⟨ ins , env , stack , fr ⟩
-
-funda2 : 
-  Γ ⊢ ins ∈ Δ ⟶ (Δ' ∷ A) → 
-  env ⊨ Γ → 
-  stack ⊨ Δ → 
-  Halt-E Γ env → 
-  Halt-E Δ stack →
-  (hf : Halt-F ⟨ ins , env , stack , fr ⟩) → 
-  Halt A (Halt-F.res hf)
+  Halt-FC A ins env stack fr
 
 funda-rec : 
   {inZ inS : Is}{fr : Frame} → 
@@ -221,260 +171,117 @@ funda-rec :
   stack ⊨ Δ →
   Halt-E Γ env → 
   Halt-E Δ stack →  
-  (∀{v} → Halt A v → Halt-F ⟨ ins , env , stack ∷ v , fr ⟩) →
+  (∀{v} → Halt A v → Σ (Halt-F ⟨ ins , env , stack ∷ v , fr ⟩) (λ hf → Halt B (Halt-F.res hf))) →
   (n : ℕ) → 
-  Halt-F ⟨ rec inZ inS ⨾ ins , env , stack ∷ lit-n n , fr ⟩
+  Σ (Halt-F ⟨ rec inZ inS ⨾ ins , env , stack ∷ lit-n n , fr ⟩) (λ hf → Halt B (Halt-F.res hf))
 
-funda2-rec : 
-  {inZ inS : Is}{fr : Frame} → 
-  Γ ⊢ ins ∈ (Δ ∷ A) ⟶ (Δ' ∷ B) → 
-  Γ ⊢ inZ ∈ · ⟶ (Γ' ∷ A) → 
-  (Γ ∷ Nat ∷ A) ⊢ inS ∈ · ⟶ (Γ'' ∷ A) → 
-  env ⊨ Γ → 
-  stack ⊨ Δ →
-  Halt-E Γ env → 
-  Halt-E Δ stack →  
-  (∀{v} → Halt A v → (hf : Halt-F ⟨ ins , env , stack ∷ v , fr ⟩) → Halt B (Halt-F.res hf)) →
-  (n : ℕ) → 
-  (hf : Halt-F ⟨ rec inZ inS ⨾ ins , env , stack ∷ lit-n n , fr ⟩) → 
-  Halt B (Halt-F.res hf)
+funda Ty-ret ty-env (Env-cons ta ty-st) henv (hst , hv) = (halt-f ε zero) , hv
 
-funda Ty-ret ty-env (Env-cons ta ty-st) h-env (h-st , hv) = halt-f ε zero
+funda (Ty-⨾ Ty-pop ty-ins) ty-env (Env-cons ta ty-st) henv (hst , hv) 
+  with funda ty-ins ty-env ty-st henv hst 
+... | halt-f σ nb , hv = halt-f (Op-pop ∷ σ) (zero , nb) , hv
 
-funda (Ty-⨾ Ty-pop ty-ins) ty-env (Env-cons _ ty-st) h-env (h-st , _)
-  with funda ty-ins ty-env ty-st h-env h-st
-... | halt-f σ nb = halt-f (Op-pop ∷ σ) (zero , nb)
+funda (Ty-⨾ Ty-swap ty-ins) ty-env (Env-cons tb (Env-cons ta ty-st)) henv ((hst , ha) , hb)
+  with funda ty-ins ty-env (Env-cons ta (Env-cons tb ty-st)) henv ((hst , hb) , ha)
+... | halt-f σ nb , hv = halt-f (Op-swap ∷ σ) (zero , nb) , hv
 
-funda (Ty-⨾ Ty-swap ty-ins) ty-env (Env-cons tb (Env-cons ta ty-st)) h-env ((h-st , ha) , hb)
-  with funda ty-ins ty-env (Env-cons ta (Env-cons tb ty-st)) h-env ((h-st , hb) , ha)
-... | halt-f σ nb = halt-f (Op-swap ∷ σ) (zero , nb)
+funda {fr = fr} (Ty-⨾ Ty-app ty-ins) ty-env (Env-cons ta (Env-cons (Ty-clo {ins = ins'} ty-env' ty-ins') ty-st)) henv ((hst , (ty-clo , hf)) , ha) = 
+  let 
+    asm = hf {fr = fr} ha 
+    ind = funda ty-ins ty-env (Env-cons (Halt-F-Preservation (π₁ (hf ha)) ty-ins' (Env-cons ta ty-env') Env-nil) ty-st) henv (hst , π₂ (hf ha)) 
+  in
+  (halt-f 
+    (Op-app ∷ (trace-rw (π₁ (hf ha)) ⋈ (Op-ret ∷ trace-rw (π₁ ind)))) 
+    (zero , Not-below-⋈ {σ = trace-rw (π₁ (hf ha))} (Not-below-pred (nb-rw (π₁ (hf ha)))) ((more zero) , nb-rw (π₁ ind)))
+  ) , 
+  π₂ ind
 
--- Application halts by the logical relation's definition.
-funda {fr = fr} (Ty-⨾ Ty-app ty-ins) ty-env (Env-cons ta (Env-cons (Ty-clo {ins = ins'} ty-env' ty-ins') ty-st)) h-env ((h-st , (ty-clo , hf)) , ha) with hf ha 
-... | halt-TT , halt-B = halt-TT (λ hb → funda {fr = fr} ty-ins ty-env (Env-cons (Halt-ty hb) ty-st) h-env (h-st , hb))
+funda (Ty-⨾ Ty-unit ty-ins) ty-env ty-st henv hst
+  with funda ty-ins ty-env (Env-cons Ty-unit ty-st) henv (hst , tt)
+... | halt-f σ nb , hv = halt-f (Op-unit ∷ σ) (zero , nb) , hv
 
-funda (Ty-⨾ Ty-unit ty-ins) ty-env ty-st h-env h-st
-  with funda ty-ins ty-env (Env-cons Ty-unit ty-st) h-env (h-st , tt)
-... | halt-f σ nb = halt-f (Op-unit ∷ σ) (zero , nb)
-
-funda (Ty-⨾ (Ty-var x) ty-ins) ty-env ty-st h-env h-st 
+funda (Ty-⨾ (Ty-var x) ty-ins) ty-env ty-st henv hst 
   with 
     (let ty-x = π₂ (find-var x ty-env) in 
-    funda ty-ins ty-env (Env-cons (ty-[↦]∈ ty-env ty-x) ty-st) h-env (h-st , Halt-find-var h-env ty-x))
-... | halt-f σ nb = halt-f (Op-var (π₂ (find-var x ty-env)) ∷ σ) (zero , nb)
+    funda ty-ins ty-env (Env-cons (ty-[↦]∈ ty-env ty-x) ty-st) henv (hst , Halt-find-var henv ty-x))
+... | halt-f σ nb , hv = halt-f (Op-var (π₂ (find-var x ty-env)) ∷ σ) (zero , nb) , hv
 
-funda (Ty-⨾ (Ty-st x) ty-ins) ty-env ty-st h-env h-st
+funda (Ty-⨾ (Ty-st x) ty-ins) ty-env ty-st henv hst
   with 
     (let ty-x = π₂ (find-var x ty-st) in 
-    funda ty-ins ty-env (Env-cons (ty-[↦]∈ ty-st ty-x) ty-st) h-env (h-st , Halt-find-var h-st ty-x))
-... | halt-f σ nb = halt-f (Op-st (π₂ (find-var x ty-st)) ∷ σ) (zero , nb)
+    funda ty-ins ty-env (Env-cons (ty-[↦]∈ ty-st ty-x) ty-st) henv (hst , Halt-find-var hst ty-x))
+... | halt-f σ nb , hv = halt-f (Op-st (π₂ (find-var x ty-st)) ∷ σ) (zero , nb) , hv
 
--- Goal: the closure just pushed is in halt. See Halt-clo.
-funda {fr = fr} (Ty-⨾ (Ty-pushc ty-ins') ty-ins) ty-env ty-st h-env h-st with 
-    funda {fr = fr} ty-ins ty-env (Env-cons (Ty-clo ty-env ty-ins') ty-st) h-env (h-st , 
-      Halt-clo ty-ins' ty-env 
-        (λ ha → funda ty-ins' (Env-cons (Halt-ty ha) ty-env) Env-nil (h-env , ha) tt ) 
-        (λ ha hf → funda2 ty-ins' (Env-cons (Halt-ty ha) ty-env) Env-nil (h-env , ha) tt hf ) )
-... | halt-f σ nb = halt-f (Op-pushc ∷ σ) (zero , nb)
-
--- Similar to push-c, but more tedious due to stack-partition operations.
-funda {fr = fr} (Ty-⨾ (Ty-clo pf-c len< ty-ins') ty-ins) ty-env ty-st h-env h-st 
-  with Halt-split pf-c ty-st h-st
-... | s1 , s2 , refl , ty-s1 , ty-s2 , h-s1 , h-s2 , eq 
+funda (Ty-⨾ (Ty-pushc ty-ins') ty-ins) ty-env ty-st henv hst
   with 
-    funda {fr = fr} ty-ins ty-env (Env-cons (Ty-clo ty-s2 ty-ins') ty-s1) h-env 
-      (h-s1 , 
-        Halt-clo ty-ins' ty-s2 
-          (λ ha → funda ty-ins' (Env-cons (Halt-ty ha) ty-s2) Env-nil (h-s2 , ha) tt )
-          λ ha hf → funda2 ty-ins' (Env-cons (Halt-ty ha) ty-s2) Env-nil (h-s2 , ha) tt hf
-      )
-... | halt-f σ nb = halt-f ((Op-clo refl (trans eq len<)) ∷ σ) (zero , nb)
+  funda ty-ins ty-env (Env-cons (Ty-clo ty-env ty-ins') ty-st) henv 
+    (hst , Halt-clo ty-ins' ty-env λ hv → funda ty-ins' (Env-cons (Halt-ty hv) ty-env) Env-nil (henv , hv) tt)
+... | halt-f σ nb , hv = halt-f (Op-pushc ∷ σ) (zero , nb) , hv
 
-funda (Ty-⨾ (Ty-lit n) ty-ins) ty-env ty-st h-env h-st 
-  with funda ty-ins ty-env (Env-cons Ty-nat ty-st) h-env (h-st , tt)
-... | halt-f σ nb = halt-f (Op-lit n ∷ σ) (zero , nb)
+funda (Ty-⨾ (Ty-clo pfc refl ty-ins') ty-ins) ty-env ty-st henv hst 
+  with Halt-split pfc ty-st hst
+... | s1 , s2 , refl , ty-s1 , ty-s2 , h-s1 , h-s2 , eq
+  with funda ty-ins ty-env (Env-cons (Ty-clo ty-s2 ty-ins') ty-s1) henv 
+    (h-s1 , Halt-clo ty-ins' ty-s2 (λ hv → funda ty-ins' (Env-cons (Halt-ty hv) ty-s2) Env-nil (h-s2 , hv) tt))
+... | halt-f σ nb , hv = halt-f (Op-clo refl eq ∷ σ) (zero , nb) , hv
 
-funda (Ty-⨾ Ty-suc ty-ins) ty-env (Env-cons Ty-nat ty-st) h-env (h-st , tt) 
-  with funda ty-ins ty-env (Env-cons Ty-nat ty-st) h-env (h-st , tt)
-... | halt-f σ nb = halt-f (Op-suc ∷ σ) (zero , nb)
+funda (Ty-⨾ (Ty-lit n) ty-ins) ty-env ty-st henv hst 
+  with funda ty-ins ty-env (Env-cons Ty-nat ty-st) henv (hst , tt)
+... | halt-f σ nb , hv = halt-f (Op-lit n ∷ σ) (zero , nb) , hv
 
-funda 
-  {Γ = Γ} {ins = rec inZ inS ⨾ ins} {env = env} {stack = stack ∷ lit-n n} {fr = fr} 
-  (Ty-⨾ (Ty-rec {A = A} tyZ tyS) ty-ins) ty-env (Env-cons Ty-nat ty-st) h-env (h-st , tt) = 
-    funda-rec ty-ins tyZ tyS ty-env ty-st h-env h-st ind n 
+funda (Ty-⨾ Ty-suc ty-ins) ty-env (Env-cons Ty-nat ty-st) henv (hst , tt) 
+  with funda ty-ins ty-env (Env-cons Ty-nat ty-st) henv (hst , tt)
+... | halt-f σ nb , hv = halt-f (Op-suc ∷ σ) (zero , nb) , hv
+
+funda (Ty-⨾ (Ty-rec tyZ tyS) ty-ins) ty-env (Env-cons (Ty-nat {n}) ty-st) henv (hst , tt) = 
+  funda-rec ty-ins tyZ tyS ty-env ty-st henv hst (λ hv → funda ty-ins ty-env (Env-cons (Halt-ty hv) ty-st) henv (hst , hv)) n
+
+funda (Ty-⨾ Ty-add ty-ins) ty-env (Env-cons (Ty-nat {n = n}) (Env-cons (Ty-nat {n = m}) ty-st)) henv ((hst , tt) , tt) 
+  with funda ty-ins ty-env (Env-cons Ty-nat ty-st) henv (hst , tt) 
+... | halt-f σ nb , hv = halt-f (Op-add m n ∷ σ) (zero , nb) , hv 
+
+funda (Ty-⨾ Ty-mult ty-ins) ty-env (Env-cons (Ty-nat {n = n}) (Env-cons (Ty-nat {n = m}) ty-st)) henv ((hst , tt) , tt)
+  with funda ty-ins ty-env (Env-cons Ty-nat ty-st) henv (hst , tt) 
+... | halt-f σ nb , hv = halt-f (Op-mult m n ∷ σ) (zero , nb) , hv
+
+funda (Ty-⨾ Ty-pair ty-ins) ty-env (Env-cons tb (Env-cons ta ty-st)) henv ((hst , ha) , hb) 
+  with funda ty-ins ty-env (Env-cons (Ty-pair ta tb) ty-st) henv (hst , (ha , hb)) 
+... | halt-f σ nb , hv = halt-f (Op-pair ∷ σ) (zero , nb) , hv
+
+funda (Ty-⨾ Ty-fst ty-ins) ty-env (Env-cons (Ty-pair ta tb) ty-st) henv (hst , (ha , hb))   
+  with funda ty-ins ty-env (Env-cons ta ty-st) henv (hst , ha) 
+... | halt-f σ nb , hv = halt-f (Op-fst ∷ σ) (zero , nb) , hv
+
+funda (Ty-⨾ Ty-snd ty-ins) ty-env (Env-cons (Ty-pair ta tb) ty-st) henv (hst , (ha , hb))   
+  with funda ty-ins ty-env (Env-cons tb ty-st) henv (hst , hb) 
+... | halt-f σ nb , hv = halt-f (Op-snd ∷ σ) (zero , nb) , hv
+
+funda-rec ty-ins tyZ tyS ty-env ty-st henv hst asm zero = 
+  let 
+    indZ = funda tyZ ty-env Env-nil henv tt 
+  in
+  (halt-f (Op-recZ ∷ (trace-rw (π₁ indZ) ⋈ (Op-ret ∷ trace-rw (π₁ (asm (π₂ indZ)))))) 
+  (zero , Not-below-⋈ {σ = trace-rw (π₁ indZ)} (Not-below-pred (nb-rw (π₁ indZ))) (more zero , nb-rw (π₁ (asm (π₂ indZ)))))) , 
+  π₂ (asm (π₂ indZ))
+
+funda-rec {ins = ins} {A = A} {env = env} {stack = stack} {inZ = inZ} {inS = inS} {fr = fr} 
+  ty-ins tyZ tyS ty-env ty-st henv hst asm (suc n) = 
+  halt-f (Op-recS n ∷ (trace-rw (π₁ ind) ⋈ (Op-ret ∷ trace-rw (π₁ (asm (π₂ ind)))))) 
+    (zero , Not-below-⋈ {σ = trace-rw (π₁ ind)} (Not-below-pred (nb-rw (π₁ ind))) ((more zero) , nb-rw (π₁ (asm (π₂ ind))))) , 
+  π₂ (asm (π₂ ind))
   where
-    ind : Halt A v → Halt-F ⟨ ins , env , stack ∷ v , fr ⟩
-    ind hv = funda ty-ins ty-env (Env-cons (Halt-ty hv) ty-st) h-env (h-st , hv)
-
-funda (Ty-⨾ Ty-add ty-ins) ty-env (Env-cons (Ty-nat {n = n}) (Env-cons (Ty-nat {n = m}) ty-st)) h-env ((h-st , tt) , tt) 
-  with funda ty-ins ty-env (Env-cons Ty-nat ty-st) h-env (h-st , tt) 
-... | halt-f σ nb = halt-f (Op-add m n ∷ σ) (zero , nb)
-
-funda (Ty-⨾ Ty-mult ty-ins) ty-env (Env-cons (Ty-nat {n = n}) (Env-cons (Ty-nat {n = m}) ty-st)) h-env ((h-st , tt) , tt)
-  with funda ty-ins ty-env (Env-cons Ty-nat ty-st) h-env (h-st , tt) 
-... | halt-f σ nb = halt-f (Op-mult m n ∷ σ) (zero , nb)
-
-funda (Ty-⨾ Ty-pair ty-ins) ty-env (Env-cons tb (Env-cons ta ty-st)) h-env ((h-st , ha) , hb) 
-  with funda ty-ins ty-env (Env-cons (Ty-pair ta tb) ty-st) h-env (h-st , (ha , hb)) 
-... | halt-f σ nb = halt-f (Op-pair ∷ σ) (zero , nb)
-
-funda (Ty-⨾ Ty-fst ty-ins) ty-env (Env-cons (Ty-pair ta tb) ty-st) h-env (h-st , (ha , hb))   
-  with funda ty-ins ty-env (Env-cons ta ty-st) h-env (h-st , ha) 
-... | halt-f σ nb = halt-f (Op-fst ∷ σ) (zero , nb)
-
-funda (Ty-⨾ Ty-snd ty-ins) ty-env (Env-cons (Ty-pair ta tb) ty-st) h-env (h-st , (ha , hb))   
-  with funda ty-ins ty-env (Env-cons tb ty-st) h-env (h-st , hb) 
-... | halt-f σ nb = halt-f (Op-snd ∷ σ) (zero , nb)
-
-funda2 {fr = fr} Ty-ret ty-env (Env-cons ta ty-st) h-env (h-st , hv) (halt-f ε nb) = hv
-
-funda2 {fr = fr} Ty-ret ty-env (Env-cons ta ty-st) h-env (h-st , hv) (halt-f (Op-ret ∷ (_ ∷ σ)) (_ , fr< , nb)) = absurd (≤ᵣ-cons-neq fr<)
-
-funda2 (Ty-⨾ Ty-pop ty-ins) ty-env (Env-cons _ ty-st) h-env (h-st , _) (halt-f (Op-pop ∷ σ) (fr< , nb)) =
-  funda2 ty-ins ty-env ty-st h-env h-st (halt-f σ nb)
-
-funda2 (Ty-⨾ Ty-swap ty-ins) ty-env (Env-cons tb (Env-cons ta ty-st)) h-env ((h-st , ha) , hb) (halt-f (Op-swap ∷ σ) (fr< , nb)) =
-  funda2 ty-ins ty-env (Env-cons ta (Env-cons tb ty-st)) h-env ((h-st , hb) , ha) (halt-f σ nb)
-
--- Need the apply-split lemma to break down the halting sequence, and use I.H. 
--- to show that the value returned from this application is in halt.
-funda2 {fr = fr} (Ty-⨾ Ty-app ty-ins) ty-env (Env-cons ta (Env-cons (Ty-clo {ins = ins'} ty-env' ty-ins') ty-st)) h-env ((h-st , ty-clo , hf) , ha) (halt-f (Op-app ∷ σ) (fr< , nb) ⦃ refl ⦄ ⦃ refl ⦄) 
-  with Apply-split σ | hf ha
-... | dump' , res' , σ₁ , σ₂ , eq , nb1 | halt-TT , halt-B = 
-  let nbs = Not-below-⋈-inv {σ₁ = σ₁} {σ₂ = Op-ret ∷ σ₂} nb eq in
-  let hf₁ = halt-f σ₁ nb1 in
-  funda2 ty-ins ty-env (Env-cons (Halt-F-Preservation hf₁ ty-ins' (Env-cons ta ty-env') Env-nil) ty-st) h-env (h-st , halt-B hf₁) (halt-f σ₂ (π₂ (π₂ nbs)))
-
-funda2 (Ty-⨾ Ty-unit ty-ins) ty-env ty-st h-env h-st (halt-f (Op-unit ∷ σ) (fr< , nb)) = 
-  funda2 ty-ins ty-env (Env-cons Ty-unit ty-st) h-env (h-st , tt) (halt-f σ nb)
-
-funda2 (Ty-⨾ (Ty-var x) ty-ins) ty-env ty-st h-env h-st (halt-f (Op-var ty-x ∷ σ) (fr< , nb)) = 
-  funda2 ty-ins ty-env (Env-cons (ty-[↦]∈ ty-env ty-x) ty-st) h-env (h-st , Halt-find-var h-env ty-x) (halt-f σ nb)
-
-funda2 (Ty-⨾ (Ty-st x) ty-ins) ty-env ty-st h-env h-st (halt-f (Op-st ty-x ∷ σ) (fr< , nb)) =
-  funda2 ty-ins ty-env (Env-cons (ty-[↦]∈ ty-st ty-x) ty-st) h-env (h-st , Halt-find-var h-st ty-x) (halt-f σ nb)
-
-funda2 (Ty-⨾ (Ty-pushc ty-ins') ty-ins) ty-env ty-st h-env h-st (halt-f (Op-pushc ∷ σ) (fr< , nb)) =  
-  funda2 ty-ins ty-env (Env-cons (Ty-clo ty-env ty-ins') ty-st) h-env (h-st , 
-    Halt-clo ty-ins' ty-env 
-      (λ ha → funda ty-ins' (Env-cons (Halt-ty ha) ty-env) Env-nil (h-env , ha) tt ) 
-      (λ ha hf → funda2 ty-ins' (Env-cons (Halt-ty ha) ty-env) Env-nil (h-env , ha) tt hf ) )
-  (halt-f σ nb)
-
-funda2 (Ty-⨾ (Ty-clo pf-c len<-c ty-ins') ty-ins) ty-env ty-st h-env h-st (halt-f ((Op-clo {s1 = s1} {s2 = s2} pf len<) ∷ σ) (fr< , nb))  
-  with Halt-split-ty ty-st pf-c pf (trans len<-c (sym len<)) h-st  
-... | ty-s1 , ty-s2 , h-s1 , h-s2 = 
-  funda2 ty-ins ty-env (Env-cons (Ty-clo ty-s2 ty-ins') ty-s1) h-env (h-s1 , 
-    Halt-clo ty-ins' ty-s2 
-        (λ ha → funda ty-ins' (Env-cons (Halt-ty ha) ty-s2) Env-nil (h-s2 , ha) tt ) 
-        (λ ha hf → funda2 ty-ins' (Env-cons (Halt-ty ha) ty-s2) Env-nil (h-s2 , ha) tt hf ) 
-    ) 
-  (halt-f σ nb)
-
-funda2 (Ty-⨾ (Ty-lit n) ty-ins) ty-env ty-st h-env h-st (halt-f (Op-lit n ∷ σ) (fr< , nb)) = 
-  funda2 ty-ins ty-env (Env-cons Ty-nat ty-st) h-env (h-st , tt) (halt-f σ nb)
-
-funda2 (Ty-⨾ Ty-suc ty-ins) ty-env (Env-cons Ty-nat ty-st) h-env (h-st , tt) (halt-f (Op-suc ∷ σ) (fr< , nb)) = 
-  funda2 ty-ins ty-env (Env-cons Ty-nat ty-st) h-env (h-st , tt) (halt-f σ nb) 
-funda2 
-  {Γ = Γ} {ins = rec inZ inS ⨾ ins} {A = B} {env = env} {stack = stack ∷ lit-n n} {fr = fr} 
-  (Ty-⨾ (Ty-rec {A = A} tyZ tyS) ty-ins) ty-env (Env-cons Ty-nat ty-st) h-env (h-st , tt) hf = 
-    funda2-rec ty-ins tyZ tyS ty-env ty-st h-env h-st ind2 n hf
-  where
-    ind : Halt A v → Halt-F ⟨ ins , env , stack ∷ v , fr ⟩
-    ind hv = funda ty-ins ty-env (Env-cons (Halt-ty hv) ty-st) h-env (h-st , hv)
-
-    ind2 : Halt A v → (hf : Halt-F ⟨ ins , env , stack ∷ v , fr ⟩) → Halt B (Halt-F.res hf)
-    ind2 hv hf = funda2 ty-ins ty-env (Env-cons (Halt-ty hv) ty-st) h-env (h-st , hv) hf
-
-    ind-Z : ∀{fr} → Halt-F ⟨ inZ , env , · , fr ⟩
-    ind-Z = funda tyZ ty-env Env-nil h-env tt
-
-    ind2-Z : ∀{fr} → (hf : Halt-F ⟨ inZ , env , · , fr ⟩) → Halt _ (Halt-F.res hf)
-    ind2-Z hf = funda2 tyZ ty-env Env-nil h-env tt hf
+    h-cloS : ∀{n} → Halt (A ⇒ A) (< env ∷ lit-n n , inS >)
+    h-cloS = (Ty-clo (Env-cons Ty-nat ty-env) tyS) , λ hv → funda tyS (Env-cons (Halt-ty hv) (Env-cons Ty-nat ty-env)) Env-nil ((henv , tt) , hv) tt
     
-    h-cloS : ∀{n} → Halt (A ⇒ A) (< env ∷ lit-n n , inS >)
-    h-cloS = 
-      Halt-clo tyS (Env-cons Ty-nat ty-env) 
-        (λ ha → funda tyS (Env-cons (Halt-ty ha) (Env-cons Ty-nat ty-env)) Env-nil ((h-env , tt) , ha) tt ) 
-        (λ ha hf → funda2 tyS (Env-cons (Halt-ty ha) (Env-cons Ty-nat ty-env)) Env-nil ((h-env , tt) , ha) tt hf )
+    ind : ∀{fr} → Σ (Halt-F ⟨ rec inZ inS ⨾ app ⨾ ret , env , · ∷ < env ∷ lit-n n , inS > ∷ lit-n n , fr ⟩) (λ hf → Halt A (Halt-F.res hf)) 
+    ind = funda-rec (Ty-⨾ Ty-app Ty-ret) tyZ tyS ty-env (Env-cons (Ty-clo (Env-cons Ty-nat ty-env) tyS) Env-nil) henv 
+      (tt , (Ty-clo (Env-cons Ty-nat ty-env) tyS) , λ hv → (π₂ h-cloS) hv) 
+      (λ hv → 
+        halt-f (Op-app ∷ (trace-rw (π₁ ((π₂ h-cloS) hv)) ⋈ (Op-ret ∷ ε))) 
+        (zero , Not-below-⋈ {σ = trace-rw (π₁ ((π₂ h-cloS) hv))} (Not-below-pred (nb-rw (π₁ ((π₂ h-cloS) hv)))) (more zero , zero)) , 
+        π₂ ((π₂ h-cloS) hv)) 
+      n
 
-funda2 (Ty-⨾ Ty-add ty-ins) ty-env (Env-cons Ty-nat (Env-cons Ty-nat ty-st)) h-env ((h-st , tt) , tt) (halt-f (Op-add m n ∷ σ) (fr< , nb)) = 
-  funda2 ty-ins ty-env (Env-cons Ty-nat ty-st) h-env (h-st , tt) (halt-f σ nb)
-
-funda2 (Ty-⨾ Ty-mult ty-ins) ty-env (Env-cons Ty-nat (Env-cons Ty-nat ty-st)) h-env ((h-st , tt) , tt) (halt-f (Op-mult m n ∷ σ) (fr< , nb)) = 
-  funda2 ty-ins ty-env (Env-cons Ty-nat ty-st) h-env (h-st , tt) (halt-f σ nb)
-
-funda2 (Ty-⨾ Ty-pair ty-ins) ty-env (Env-cons tb (Env-cons ta ty-st)) h-env ((h-st , ha) , hb) (halt-f (Op-pair ∷ σ) (fr< , nb)) = 
-  funda2 ty-ins ty-env (Env-cons (Ty-pair ta tb) ty-st) h-env (h-st , ha , hb) (halt-f σ nb)
-
-funda2 (Ty-⨾ Ty-fst ty-ins) ty-env (Env-cons (Ty-pair ta tb) ty-st) h-env (h-st , (ha , hb))  (halt-f (Op-fst ∷ σ) (fr< , nb)) =
-  funda2 ty-ins ty-env (Env-cons ta ty-st) h-env (h-st , ha) (halt-f σ nb)
-
-funda2 (Ty-⨾ Ty-snd ty-ins) ty-env (Env-cons (Ty-pair ta tb) ty-st) h-env (h-st , (ha , hb)) (halt-f (Op-snd ∷ σ) (fr< , nb)) = 
-  funda2 ty-ins ty-env (Env-cons tb ty-st) h-env (h-st , hb) (halt-f σ nb)
-
-funda-rec ty-ins tyZ tyS ty-env ty-st h-env h-st asm zero = 
-  let ind-Z = funda tyZ ty-env Env-nil h-env tt in
-  let ind-asm = asm (funda2 tyZ ty-env Env-nil h-env tt ind-Z) in
-  halt-f 
-    (Op-recZ ∷ (trace-rw ind-Z ⋈ (Op-ret ∷ trace-rw ind-asm ))) 
-    (zero , Not-below-⋈ {σ = trace-rw ind-Z} (Not-below-pred (nb-rw ind-Z)) (more zero , nb-rw ind-asm))
-
-funda-rec {ins = ins} {A = A} {env = env} {stack = stack} {inZ = inZ} {inS = inS} {fr = fr} ty-ins tyZ tyS ty-env ty-st h-env h-st asm (suc n) = 
-  halt-f 
-    (Op-recS n ∷ ((trace-rw ind) ⋈ (Op-ret ∷ trace-rw (asm ind2))))
-    (zero , (Not-below-⋈ {σ = trace-rw ind} (Not-below-pred (nb-rw ind)) (more zero , nb-rw (asm ind2))))
-  where 
-    h-cloS : ∀{n} → Halt (A ⇒ A) (< env ∷ lit-n n , inS >)
-    h-cloS = 
-      Halt-clo tyS (Env-cons Ty-nat ty-env) 
-        (λ ha → funda tyS (Env-cons (Halt-ty ha) (Env-cons Ty-nat ty-env)) Env-nil ((h-env , tt) , ha) tt ) 
-        (λ ha hf → funda2 tyS (Env-cons (Halt-ty ha) (Env-cons Ty-nat ty-env)) Env-nil ((h-env , tt) , ha) tt hf )
- 
-    asm' : ∀{n v fr} → Halt A v → Halt-F ⟨ app ⨾ ret , env , · ∷ < env ∷ lit-n n , inS > ∷ v , fr ⟩
-    asm' hv = π₁ ((π₂ h-cloS) hv) (λ _ → halt-f ε zero) 
-
-    asm2' : ∀{n v fr} → Halt A v → (hf : Halt-F ⟨ app ⨾ ret , env , · ∷ < env ∷ lit-n n , inS > ∷ v , fr ⟩) → Halt A (Halt-F.res hf)
-    asm2' hv (halt-f (Op-app ∷ σ) (_ , nb) ⦃ refl ⦄ ⦃ refl ⦄) with Apply-split σ
-    ... | _ , res , σ₁ , σ₂ , refl , nb' =
-      let nb2 = π₂ (π₂ (Not-below-⋈-inv {σ₁ = σ₁} nb refl)) in
-      let eq = π₂ (∷-inj (Not-below-ret σ₂ refl nb2)) in 
-      subst (Halt A) eq (π₂ (π₂ h-cloS hv) (halt-f σ₁ nb'))
-
-    ind : ∀{fr} → Halt-F ⟨ rec inZ inS ⨾ app ⨾ ret , env , · ∷ < env ∷ lit-n n , inS > ∷ lit-n n , fr ⟩ 
-    ind = funda-rec (Ty-⨾ Ty-app Ty-ret) tyZ tyS ty-env (Env-cons (Ty-clo (Env-cons Ty-nat ty-env) tyS) Env-nil) h-env (tt , h-cloS) asm' n
-
-    ind2 = funda2-rec (Ty-⨾ Ty-app Ty-ret) tyZ tyS ty-env (Env-cons (Ty-clo (Env-cons Ty-nat ty-env) tyS) Env-nil) h-env (tt , h-cloS) asm2' n ind
-
-funda2-rec ty-ins tyZ tyS ty-env ty-st h-env h-st asm zero (halt-f (Op-recZ ∷ σ) (_ , nb) ⦃ refl ⦄ ⦃ refl ⦄) 
-  with Apply-split σ
-... | dump , res , δ₁ , δ₂ , refl , nb1 = 
-  let nbs = Not-below-⋈-inv {σ₁ = δ₁} nb refl in
-  asm (funda2 tyZ ty-env Env-nil h-env tt (halt-f δ₁ nb1)) (halt-f δ₂ (π₂ (π₂ nbs)))
-
-funda2-rec  
-  {ins = ins} {A = A} {env = env} {stack = stack} {inZ = inZ} {inS = inS} {fr = fr}
-  ty-ins tyZ tyS ty-env ty-st h-env h-st asm (suc n) (halt-f (Op-recS n ∷ σ) (_ , nb) ⦃ refl ⦄ ⦃ refl ⦄) 
-  with Apply-split σ
-... | _ , res , δ₁ , δ₂ , refl , nb' = asm (ind2 (halt-f δ₁ nb')) (halt-f δ₂ (π₂ (π₂ nbs)))
-    where
-      h-cloS : ∀{n} → Halt (A ⇒ A) (< env ∷ lit-n n , inS >)
-      h-cloS = 
-        Halt-clo tyS (Env-cons Ty-nat ty-env) 
-          (λ ha → funda tyS (Env-cons (Halt-ty ha) (Env-cons Ty-nat ty-env)) Env-nil ((h-env , tt) , ha) tt ) 
-          (λ ha hf → funda2 tyS (Env-cons (Halt-ty ha) (Env-cons Ty-nat ty-env)) Env-nil ((h-env , tt) , ha) tt hf )
-  
-      asm2' : ∀{n v fr} → Halt A v → (hf : Halt-F ⟨ app ⨾ ret , env , · ∷ < env ∷ lit-n n , inS > ∷ v , fr ⟩) → Halt A (Halt-F.res hf)
-      asm2' hv (halt-f (Op-app ∷ σ) (_ , nb) ⦃ refl ⦄ ⦃ refl ⦄) with Apply-split σ
-      ... | _ , res , σ₁ , σ₂ , refl , nb' =
-        let nb2 = π₂ (π₂ (Not-below-⋈-inv {σ₁ = σ₁} nb refl)) in
-        let eq = π₂ (∷-inj (Not-below-ret σ₂ refl nb2)) in 
-        subst (Halt A) eq (π₂ (π₂ h-cloS hv) (halt-f σ₁ nb'))
-
-      ind2 = funda2-rec (Ty-⨾ Ty-app Ty-ret) tyZ tyS ty-env (Env-cons (Ty-clo (Env-cons Ty-nat ty-env) tyS) Env-nil) h-env (tt , h-cloS) asm2' n
-      
-      nbs = Not-below-⋈-inv {σ₁ = δ₁} nb refl
 
 -- Termination, by the fundamental lemma.
 -- Every well-typed value is in halt.
@@ -482,10 +289,8 @@ mutual
   Halting : ⊢ v ∈ A → Halt A v
   Halting Ty-unit = tt
   Halting {A = A ⇒ B} (Ty-clo {env = env} {ins = ins} ty-env ty-ins) = 
-    let h-env = Halting-E ty-env in
-      Halt-clo ty-ins ty-env 
-        (λ ha → funda ty-ins (Env-cons (Halt-ty ha) ty-env) Env-nil (h-env , ha) tt) 
-        (λ ha hf → funda2 ty-ins (Env-cons ((Halt-ty ha)) ty-env) Env-nil (h-env , ha) tt hf)
+    let henv = Halting-E ty-env in 
+      Ty-clo ty-env ty-ins , λ hv → funda ty-ins (Env-cons (Halt-ty hv) ty-env) Env-nil (henv , hv) tt
   Halting Ty-nat = tt
   Halting (Ty-pair ta tb) = Halting ta , Halting tb
 
@@ -496,7 +301,7 @@ mutual
 -- Well-formed configurations halt at the current frame.
 Termination-F : WF-Config A₀ c → Halt-F c
 Termination-F (well-formed ty-ins ty-env ty-st ty-fr) = 
-  funda ty-ins ty-env ty-st (Halting-E ty-env) (Halting-E ty-st)
+  π₁ (funda ty-ins ty-env ty-st (Halting-E ty-env) (Halting-E ty-st))
 
 -- Well-formed configurations halt, by induction on the number of frames.
 Termination : WF-Config A₀ c → (Σ Val (λ v → c ⇓ v))
@@ -540,3 +345,4 @@ eval' {c = c} wf = eval-aux c wf (π₂ (π₂ (Termination-n wf)))
     eval-aux {n = suc n} c wf (step σ op) with Progress wf
     eval-aux {v = _} {suc n} c wf (step σ ()) | inj₁ (_ , finish)
     ... | inj₂ (c' , op') rewrite Determinacy op op' = eval-aux c' (Preservation op' wf) σ
+
