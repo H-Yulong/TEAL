@@ -85,6 +85,7 @@ find-var : ∀{@0 Γ A} → Var Γ A → Env Γ → Val A
 find-var v₀ (env ∷ v) = v
 find-var (vs x) (env ∷ v) = find-var x env
 
+-- Take one step for a machine. Does nothing if machine halts.
 step : Config A₀ → Config A₀
 step ⟨ ins , env , stack , fr ⟩ = step' ins env stack fr
   where    
@@ -204,6 +205,7 @@ Termination c = H.Termination-n (π₂ (transform-C c))
 find-var-preserve v₀ (env ∷ v) S.hd = refl
 find-var-preserve (vs x) (env ∷ v) (S.tl pf) = find-var-preserve x env pf
 
+-- Step preserves operational semantics
 @0 step-preserve : ∀{c'} → (c : Config A₀) → π₁ (transform-C c) S.⟶ c' → c' ≡ π₁ (transform-C (step c))
 step-preserve ⟨ ret , env , stack ∷ x , fr ∷< ins' , env' , stack' > ⟩ S.Op-ret = refl
 step-preserve ⟨ pop ⨾ ins , env , stack ∷ v , fr ⟩ S.Op-pop = refl
@@ -227,12 +229,14 @@ step-preserve ⟨ pair ⨾ ins , env , stack ∷ v ∷ v' , fr ⟩ S.Op-pair = r
 step-preserve ⟨ fst ⨾ ins , env , stack ∷ (v ,, v') , fr ⟩ S.Op-fst = refl
 step-preserve ⟨ snd ⨾ ins , env , stack ∷ (v ,, v') , fr ⟩ S.Op-snd = refl
 
+-- Take pred for termination proofs
 @0 step-lemma : ∀{v n} → 
   (c : Config A₀) → 
   π₁ (transform-C c) ⇓₀ v , suc n → 
   π₁ (transform-C (step c)) ⇓₀ v , n
 step-lemma c (S.step pf op) = subst-0 (λ z → z ⇓₀ _ , _) (step-preserve c op) pf
 
+-- Examines the configuration, see if it is at halt
 halt-lemma : ∀{@0 A₀ v n} → 
   (c : Config A₀) → 
   (@0 pf : π₁ (transform-C c) ⇓₀ v , n) → 
@@ -244,6 +248,8 @@ halt-lemma ⟨ ret , env , stack ∷ v , fr ∷< ins' , env' , stack' > ⟩ pf =
 halt-lemma ⟨ i ⨾ ins , env , stack , fr ⟩ pf = 
   subst-0 (λ z → Halt? _ z) (π₁ (π₂ (S.step-ins pf))) (go ((π₂ (π₂ (S.step-ins pf)))))
 
+-- The erased [n] is the termination factor
+-- If the machine stops, do nothing. Otherwise, step and recurse.
 step-exe : ∀{@0 A₀ n} → Config-exe A₀ n → Config-exe A₀ zero
 step-exe (conf-exe c (stop pf)) = conf-exe c (stop pf)
 step-exe (conf-exe c (go pf)) = step-exe (conf-exe (step c) (halt-lemma (step c) (step-lemma c pf)))
@@ -253,4 +259,3 @@ result (conf-exe ⟨ ret , env , stack ∷ v , · ⟩ (stop pf)) = v
 
 interp : ∀{@0 A₀} → (c : Config A₀) → Val A₀
 interp c = result (step-exe (conf-exe c (halt-lemma c (π₂ (π₂ (Termination c))))))
-
