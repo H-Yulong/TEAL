@@ -1,4 +1,4 @@
-module Functional.Calculus.Syntax where
+module @0 Functional.Calculus.Syntax where
 
 open import Basic
 open import Context

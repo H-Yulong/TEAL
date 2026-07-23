@@ -1,4 +1,4 @@
-module Functional.Calculus.Shallow where
+module @0 Functional.Calculus.Shallow where
 
 open import Data.Nat hiding (suc)
 open import Data.Product renaming (proj₁ to π₁; proj₂ to π₂)

@@ -1,4 +1,4 @@
-module Functional.TermMachine.Types where
+module @0 Functional.TermMachine.Types where
 
 open import Data.Product using (Σ; _×_; _,_) renaming (proj₁ to π₁; proj₂ to π₂)
 open import Data.Sum hiding (swap)
@@ -291,9 +291,9 @@ st-[↦]∈ (St-cons ty-st tv) (tl tx) = st-[↦]∈ ty-st tx
     env⊨ ⊢[ s1 ⊨ σ₁ ] × 
     env⊨ ⊢[ s2 ⊨ σ₂ ]))
 ⊨++ {stack = stack} {σ₂ = ·} ⦃ refl ⦄ ty-st refl = stack , · , refl , ty-st , St-nil
-⊨++ {stack = stack ∷ v} {σ₂ = σ₂ ∷ t} ⦃ refl ⦄ (St-cons ty-st tv) refl 
-  with ⊨++ {σ₂ = σ₂} ty-st refl 
-... | s1 , s2 , refl , ty-s1 , ty-s2 = s1 , s2 ∷ v , refl , ty-s1 , St-cons ty-s2 tv
+⊨++ {stack = stack ∷ v} {σ₂ = σ₂ ∷ t} ⦃ refl ⦄ (St-cons ty-st tv) refl =
+  let s1 , s2 , eq , ty-s1 , ty-s2 = ⊨++ {σ₂ = σ₂} ty-st refl in
+    s1 , s2 ∷ v , cong (λ z → z ∷ v) eq , ty-s1 , St-cons ty-s2 tv
 
 ⊨-len : ∀{n} → 
   {γ : Sub · Γ}{env⊨ : env ⊨ Γ as γ}{σ : Stack Γ Δ} → 
