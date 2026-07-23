@@ -1,4 +1,4 @@
-module Functional.TypeMachine.Termination where 
+module @0 Functional.TypeMachine.Termination where 
 
 open import Data.Nat
 open import Data.Product using (Σ; _×_; _,_) renaming (proj₁ to π₁; proj₂ to π₂)
@@ -142,10 +142,12 @@ Halt-split : ∀{Δ₁ Δ₂} →
   ))
 Halt-split {stack = stack} {Δ₂ = ·} refl ty-st hst = 
   stack , · , refl , ty-st , Env-nil , hst , tt , refl
-Halt-split {stack = stack ∷ v} {Δ₂ = Δ₂ ∷ A} refl (Env-cons ta ty-st) (hst , ha)
- with Halt-split {stack = stack} {Δ₂ = Δ₂} refl ty-st hst 
-... | s1 , s2 , refl , ty-s1 , ty-s2 , h-s1 , h-s2 , eq = 
-  s1 , s2 ∷ v , refl , ty-s1 , Env-cons ta ty-s2 , h-s1 , (h-s2 , ha) , cong suc eq
+Halt-split {stack = stack ∷ v} {Δ₂ = Δ₂ ∷ A} refl (Env-cons ta ty-st) (hst , ha) = 
+  let 
+    (s1 , s2 , eq' , ty-s1 , ty-s2 , h-s1 , h-s2 , eq) = Halt-split {stack = stack} {Δ₂ = Δ₂} refl ty-st hst 
+  in 
+    s1 , s2 ∷ v , cong (λ z → z ∷ v) eq' , ty-s1 , Env-cons ta ty-s2 , h-s1 , (h-s2 , ha) , cong suc eq
+
 
 Halt-clo : 
   (Γ ∷ A) ⊢ ins ∈ · ⟶ (Δ ∷ B) → 
@@ -282,7 +284,6 @@ funda-rec {ins = ins} {A = A} {env = env} {stack = stack} {inZ = inZ} {inS = inS
         π₂ ((π₂ h-cloS) hv)) 
       n
 
-
 -- Termination, by the fundamental lemma.
 -- Every well-typed value is in halt.
 mutual
@@ -345,4 +346,19 @@ eval' {c = c} wf = eval-aux c wf (π₂ (π₂ (Termination-n wf)))
     eval-aux {n = suc n} c wf (step σ op) with Progress wf
     eval-aux {v = _} {suc n} c wf (step σ ()) | inj₁ (_ , finish)
     ... | inj₂ (c' , op') rewrite Determinacy op op' = eval-aux c' (Preservation op' wf) σ
+
+Termination-n+ : 
+    {i : Instr} → 
+    Γ ⊢ᵢ i ∈ Δ'' ⟶ Δ →  
+    Γ ⊢ ins ∈ Δ ⟶ (Δ' ∷ A) →
+    env ⊨ Γ → 
+    stack ⊨ Δ'' →
+    Γ' ⊢ᵣ fr ∈ A ⟶ A₀ → 
+    Σ Val (λ v → Σ ℕ (λ n → ⟨ (i ⨾ ins) , env , stack , fr ⟩ ⇓₀ v , suc n))
+Termination-n+ ty-i ty-ins ty-env ty-stack ty-fr 
+  with Progress (well-formed (Ty-⨾ ty-i ty-ins) ty-env ty-stack ty-fr)
+... | inj₂ (c , op) = 
+  let v , n' , tr = Termination-n (Preservation op (well-formed (Ty-⨾ ty-i ty-ins) ty-env ty-stack ty-fr)) in
+    v , n' , step tr op
+
 

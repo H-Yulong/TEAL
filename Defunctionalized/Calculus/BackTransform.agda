@@ -1,14 +1,13 @@
-module DLC.BackTransform where
+module Defunctionalized.Calculus.BackTransform where
 
 open import Relation.Binary.PropositionalEquality 
-  using (_≡_ ; refl ; trans ; cong ; subst ; cong₂)
 
 open import Basic
 open import Context
-open import DLC.Syntax
+open import Defunctionalized.Calculus.Syntax
 
-import STLC.Syntax as S
-open import STLC.Properties
+import Functional.Calculus.Syntax as S
+-- open import STLC.Properties
 
 {- Backward transformation -}
 
@@ -27,7 +26,8 @@ open import STLC.Properties
 ⟦ ε ⟧s = λ ()
 ⟦ st , t ⟧s = ⟦ st ⟧s S.▻ ⟦ t ⟧
 
-{- Correctness proofs -} 
+{-
+{- Correctness proofs : later. -} 
 Lem-subst : ∀{D Γ Δ A} → (t : Tm D Γ A) → (σ : St D Δ Γ) → ⟦ t [ σ ] ⟧ ≡ ⟦ t ⟧ S.[ ⟦ σ ⟧s ]
 Lem-subst-st : ∀{D Γ Δ Δ'} → (st : St D Γ Δ) → (σ : St D Δ' Γ) → ⟦ st [ σ ]s ⟧s ~= (⟦ st ⟧s S.~ ⟦ σ ⟧s)
 
@@ -47,7 +47,7 @@ Lem-red-lock {D ⨾ t'} (red-β {ℓ = ℓ₀} {st} {t}) =
     subst P {!   !} S.red-β
 Lem-red-lock (red-β {ℓ = ℓs ℓ}) = {!   !}
 Lem-red-lock (red-app move) = S.red-app (Lem-red-lock move)
-
+-}
 
 
 

@@ -27,3 +27,12 @@ ext-⊤ pf = cong (λ a _ → a) pf
 
 ext-tt : ∀{i}{A : Set i}{f g : ⊤ → A} → (f tt ≡ g tt) → f ≡ g
 ext-tt pf = cong (λ a _ → a) pf
+
+absurd-0 : ∀{i}{A : Set i} → @0 ⊥ → A
+absurd-0 ()
+
+subst-0 : 
+  ∀{@0 i j}{@0 A : Set i}(@0 P : A → Set j) → 
+  {@0 x y : A} → @0 x ≡ y → P x → P y
+subst-0 P refl x = x
+

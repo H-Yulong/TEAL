@@ -1,4 +1,4 @@
-module Functional.TypeMachine.Types where
+module @0 Functional.TypeMachine.Types where
 
 open import Data.Product using (Σ; _×_; _,_) renaming (proj₁ to π₁; proj₂ to π₂)
 open import Data.Sum hiding (swap)
@@ -90,8 +90,8 @@ data WF-Config (A₀ : Ty) : Config → Set where
 
 find-var : (x : Var Γ A) → env ⊨ Γ → Σ Val (λ v → [ x ↦ v ]∈ env)
 find-var {env = env ∷ v} v₀ (Env-cons tv ty-env) = v , hd
-find-var {env = env ∷ _} (vs x) (Env-cons _ ty-env) with find-var x ty-env
-... | v , pf = v , (tl pf)
+find-var {env = env ∷ _} (vs x) (Env-cons _ ty-env) =
+  let v , pf = find-var x ty-env in v , (tl pf)
 
 ty-[↦]∈ : ∀{x : Var Γ A} → env ⊨ Γ → [ x ↦ v ]∈ env → ⊢ v ∈ A
 ty-[↦]∈ (Env-cons tv ty-env) hd = tv
@@ -106,10 +106,10 @@ ty-[↦]∈ (Env-cons _ ty-env) (tl tx) = ty-[↦]∈ ty-env tx
   stack ⊨ Δ → 
   Σ Env (λ s1 → Σ Env (λ s2 → stack ≡ (s1 ⋈e s2) × s1 ⊨ Δ₁ × s2 ⊨ Δ₂))
 ⊨++ {stack = stack} {Δ₂ = ·} refl ty-st = stack , · , refl , ty-st , Env-nil
-⊨++ {stack = stack ∷ v} {Δ₂ = Δ₂ ∷ A} refl (Env-cons ta ty-st) 
-  with ⊨++ {Δ₂ = Δ₂} refl ty-st 
-... | s1 , s2 , refl , ty-s1 , ty-s2 = s1 , (s2 ∷ v) , refl , ty-s1 , Env-cons ta ty-s2
-
+⊨++ {stack = stack ∷ v} {Δ₂ = Δ₂ ∷ A} refl (Env-cons ta ty-st) =
+  let s1 , s2 , pf , ty-s1 , ty-s2 = ⊨++ {Δ₂ = Δ₂} refl ty-st in
+    s1 , s2 ∷ v , cong (λ z → z ∷ v) pf , ty-s1 , Env-cons ta ty-s2
+ 
 ⋈e⊨++ : 
   ∀{Δ₁ Δ₂ s1 s2} → 
   stack ⊨ Δ →
@@ -211,3 +211,4 @@ Preservation* (a ∷ σ) wf = Preservation* σ (Preservation a wf)
 Preservation⇓ : c ⇓ v → (wf : WF-Config A₀ c) → ⊢ v ∈ A₀
 Preservation⇓ (halt σ) wf with Preservation* σ wf
 ... | well-formed Ty-ret _ (Env-cons ta ty-st) Frame-nil = ta
+

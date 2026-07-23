@@ -1,4 +1,4 @@
-module Functional.Syntax where
+module @0 Functional.Syntax where
 
 open import Data.Nat
 open import Data.Product using (Σ; _×_; _,_) renaming (proj₁ to π₁; proj₂ to π₂)
@@ -442,3 +442,19 @@ Determinacy-V (halt σ) (halt σ') = lem σ σ'
 step-red : c ⇓₀ v , (suc n) → c ⟶ c' → c' ⇓₀ v , n
 step-red (step finish op) op' rewrite Determinacy op' op = finish
 step-red (step (step σ a) op) op' rewrite Determinacy op' op = step σ a
+
+step-absurd : c ⇓₀ v , (suc n) → c ⇓₀ v' , zero → ⊥
+step-absurd (step op ()) finish
+
+step-halt : ⟨ ret , env , stack ∷ v , · ⟩ ⇓₀ v' , n → zero ≡ n
+step-halt finish = refl
+
+step-fr : 
+  ⟨ ins , env , stack , fr ∷< env' , stack' , ins' > ⟩ ⇓₀ v , n → 
+  Σ ℕ (λ m → (suc m ≡ n) × ⟨ ins , env , stack , fr ∷< env' , stack' , ins' > ⟩ ⇓₀ v , (suc m)) 
+step-fr (step pf op) = _ , refl , step pf op
+
+step-ins : ∀{i} → 
+  ⟨ i ⨾ ins , env , stack , fr ⟩ ⇓₀ v , n → 
+  Σ ℕ (λ m → suc m ≡ n × ⟨ i ⨾ ins , env , stack , fr ⟩ ⇓₀ v , (suc m))
+step-ins (step pf op) = _ , refl , step pf op
