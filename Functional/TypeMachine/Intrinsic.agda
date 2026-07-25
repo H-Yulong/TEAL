@@ -12,7 +12,7 @@ import Functional.Syntax as S
 import Functional.TypeMachine.Types as T
 import Functional.TypeMachine.Termination as H
 
-open S using ([_↦_]∈_; _⇓₀_,_)
+open S using ([_↦_]∈_; _⇓₀_,_; _⋈e_; len-E)
 open T using (_⊢ᵢ_∈_⟶_; _⊢_∈_⟶_; ⊢_∈_; _⊨_; _⊢ᵣ_∈_⟶_ )
 
 private variable
@@ -33,6 +33,12 @@ data Instr where
   var : (x : Var Γ A) → Instr Γ Δ (Δ ∷ A)
   st :(x : Var Δ A) → Instr Γ Δ (Δ ∷ A)
   pushc : Is (Γ ∷ A) · (Δ' ∷ B) → Instr Γ Δ (Δ ∷ A ⇒ B)
+  clo : ∀{@0 Δ₁ Δ₂} → 
+    (n : ℕ) → 
+    @0 Δ ≡ Δ₁ ++ Δ₂ →
+    @0 len-C Δ₂ ≡ n →
+    Is (Δ₂ ∷ A) · (Δ' ∷ B) → 
+    Instr Γ Δ (Δ₁ ∷ A ⇒ B)
   lit : (n : ℕ) → Instr Γ Δ (Δ ∷ Nat)
   suc : Instr Γ (Δ ∷ Nat) (Δ ∷ Nat)
   rec : 
@@ -85,6 +91,53 @@ find-var : ∀{@0 Γ A} → Var Γ A → Env Γ → Val A
 find-var v₀ (env ∷ v) = v
 find-var (vs x) (env ∷ v) = find-var x env
 
+_⋈_ : Env Γ → Env Γ' → Env (Γ ++ Γ')
+env ⋈ · = env
+env ⋈ (env' ∷ v) = (env ⋈ env') ∷ v
+
+subst-env : @0 Γ ≡ Δ → Env Δ → Env Γ
+subst-env refl env = env
+
+record Split {@0 Δ : Con} (@0 Δ₁ Δ₂ : Con) (@0 s : Env Δ) (@0 n : ℕ) : Set where
+  constructor split-st
+  field
+    s₁ : Env Δ₁
+    s₂ : Env Δ₂
+    @0 pf-c : Δ ≡ Δ₁ ++ Δ₂
+    @0 len : len-C Δ₂ ≡ n
+    @0 pf : s ≡ subst-env pf-c (s₁ ⋈ s₂)
+
+subst-sp : ∀{@0 Δ Γ₁ Γ₂ Δ₁ Δ₂ n}{@0 s : Env Δ} → @0 Γ₁ ≡ Δ₁ → @0 Γ₂ ≡ Δ₂ → Split Γ₁ Γ₂ s n → Split Δ₁ Δ₂ s n
+subst-sp refl refl sp = sp
+
+stack-split : ∀{@0 Δ Δ₁ Δ₂} → 
+  (n : ℕ) → (s : Env Δ) → 
+  @0 (Δ ≡ Δ₁ ++ Δ₂) → @0 (len-C Δ₂ ≡ n) → 
+  Split Δ₁ Δ₂ s n
+stack-split zero s pf-c len = subst-sp (π₁ (lem pf-c len)) (π₂ (lem pf-c len)) (split-st s · refl refl refl)
+  where
+    @0 lem : ∀{Δ Δ₁ Δ₂} → (Δ ≡ Δ₁ ++ Δ₂) → @0 (len-C Δ₂ ≡ zero) → Δ ≡ Δ₁ × · ≡ Δ₂
+    lem {Δ₂ = ·} refl refl = refl , refl
+stack-split (suc n) · pf-c len = absurd-0 (lem pf-c len)
+  where
+    @0 lem : ∀{Δ₁ Δ₂ n} → (· ≡ Δ₁ ++ Δ₂) → (len-C Δ₂ ≡ suc n) → ⊥
+    lem {Δ₂ = ·} refl ()
+stack-split (suc n) (s ∷ v) pf-c len = 
+  let split-st s₁ s₂ pf-c' len' pf' = stack-split n s (π₁ (π₂ (lem pf-c len))) (π₂ (π₂ (π₂ (lem pf-c len)))) in 
+    subst-sp refl (π₁ (π₂ (π₂ (lem pf-c len)))) (split-st s₁ (s₂ ∷ v) (cong (λ z → z ∷ _) pf-c') (cong suc len') (pf-lem {s₁ = s₁} pf-c' pf'))
+  where
+    @0 lem : ∀{Δ Δ₁ Δ₂ n} → 
+      (Δ ∷ A ≡ Δ₁ ++ Δ₂) → 
+      (len-C Δ₂ ≡ suc n) → Σ Con (λ Δ' → (Δ ≡ Δ₁ ++ Δ') × (Δ' ∷ A ≡ Δ₂) × len-C Δ' ≡ n) 
+    lem {Δ₂ = Δ₂ ∷ A} refl refl = Δ₂ , refl , refl , refl
+
+    @0 pf-lem : ∀{Δ Δ₁ Δ₂}
+      {s : Env Δ}{s₁ : Env Δ₁}{s₂ : Env Δ₂}{v : Val A} →  
+      (pf-c : Δ ≡ (Δ₁ ++ Δ₂)) → 
+      s ≡ subst-env pf-c (s₁ ⋈ s₂) → 
+      s ∷ v ≡ subst-env (cong (λ z → z ∷ A) pf-c) ((s₁ ⋈ s₂) ∷ v)
+    pf-lem refl refl = refl
+
 -- Take one step for a machine. Does nothing if machine halts.
 step : Config A₀ → Config A₀
 step ⟨ ins , env , stack , fr ⟩ = step' ins env stack fr
@@ -104,6 +157,9 @@ step ⟨ ins , env , stack , fr ⟩ = step' ins env stack fr
     step' (var x ⨾ ins) env stack fr = ⟨ ins , env , stack ∷ find-var x env , fr ⟩
     step' (st x ⨾ ins) env stack fr = ⟨ ins , env , stack ∷ find-var x stack , fr ⟩
     step' (pushc ins ⨾ ins') env stack fr = ⟨ ins' , env , stack ∷ < env , ins > , fr ⟩
+    step' (clo n eq len ins ⨾ ins') env stack fr = 
+      let split-st s₁ s₂ len pf-c pf = stack-split n stack eq len in
+        ⟨ ins' , env , (s₁ ∷ < s₂ , ins >) , fr ⟩
     step' (lit n ⨾ ins) env stack fr = ⟨ ins , env , stack ∷ lit-n n , fr ⟩
     step' (suc ⨾ ins) env (stack ∷ lit-n n) fr = ⟨ ins , env , stack ∷ lit-n (suc n) , fr ⟩
     step' (rec iz is ⨾ ins) env (stack ∷ lit-n zero) fr = ⟨ iz , env , · , (fr ∷< ins , env , stack >) ⟩
@@ -128,6 +184,9 @@ transform-i (st x) = S.st x , T.Ty-st x
 transform-i (pushc ins) = 
   let ins , ty-ins = transform ins in
     S.pushc ins , T.Ty-pushc ty-ins
+transform-i (clo n pf-c len ins) = 
+  let ins , ty-ins = transform ins in 
+    S.clo n ins , T.Ty-clo pf-c len ty-ins
 transform-i (lit n) = S.lit n , T.Ty-lit n
 transform-i suc = S.suc , T.Ty-suc
 transform-i (rec iz is) = 
@@ -205,6 +264,18 @@ Termination c = H.Termination-n (π₂ (transform-C c))
 find-var-preserve v₀ (env ∷ v) S.hd = refl
 find-var-preserve (vs x) (env ∷ v) (S.tl pf) = find-var-preserve x env pf
 
+@0 split-preserve : ∀{Δ₁ Δ₂ s₁ s₂} → 
+  (s : Env (Δ₁ ++ Δ₂)) → 
+  (π₁ (transform-E s)) ≡ s₁ ⋈e s₂ →
+  len-E s₂ ≡ len-C Δ₂ → 
+  let sp = stack-split {Δ = Δ₁ ++ Δ₂} {Δ₁ = Δ₁} {Δ₂ = Δ₂} (len-C Δ₂) s refl refl in
+    π₁ (transform-E (Split.s₁ sp)) ≡ s₁ × 
+    π₁ (transform-E (Split.s₂ sp)) ≡ s₂
+split-preserve {Δ₂ = ·} {s₂ = S.·} s refl refl = refl , refl
+split-preserve {Δ₂ = Δ₂ ∷ A} {s₂ = s₂ S.∷ v'} (s ∷ v) pf eq 
+  with split-preserve {Δ₂ = Δ₂} {s₂ = s₂} s (π₁ (S.∷-inj pf)) (suc-inj eq)
+... | refl , refl = refl , cong₂ S._∷_ refl (π₂ (S.∷-inj pf))
+
 -- Step preserves operational semantics
 @0 step-preserve : ∀{c'} → (c : Config A₀) → π₁ (transform-C c) S.⟶ c' → c' ≡ π₁ (transform-C (step c))
 step-preserve ⟨ ret , env , stack ∷ x , fr ∷< ins' , env' , stack' > ⟩ S.Op-ret = refl
@@ -219,6 +290,9 @@ step-preserve ⟨ st x ⨾ ins , env , stack , fr ⟩ (S.Op-st tv)
   with find-var-preserve x stack tv 
 ... | refl = refl
 step-preserve ⟨ pushc x ⨾ ins , env , stack , fr ⟩ S.Op-pushc = refl
+step-preserve ⟨ clo n refl refl ins ⨾ ins' , env , stack , fr ⟩ (S.Op-clo pf-c' len') 
+  with split-preserve stack pf-c' len' 
+... | refl , refl = refl 
 step-preserve ⟨ lit n ⨾ ins , env , stack , fr ⟩ (S.Op-lit n) = refl
 step-preserve ⟨ suc ⨾ ins , env , stack ∷ lit-n n , fr ⟩ S.Op-suc = refl
 step-preserve ⟨ rec iz is ⨾ ins , env , stack ∷ lit-n zero , fr ⟩ S.Op-recZ = refl
@@ -259,3 +333,4 @@ result (conf-exe ⟨ ret , env , stack ∷ v , · ⟩ (stop pf)) = v
 
 interp : ∀{@0 A₀} → (c : Config A₀) → Val A₀
 interp c = result (step-exe (conf-exe c (halt-lemma c (π₂ (π₂ (Termination c))))))
+
