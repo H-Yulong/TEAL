@@ -51,14 +51,15 @@ mutual
       {σ : Stack Γ Δ}{σ' : Stack (Γ ∷ A) Δ'}{t : Tm (Γ ∷ A) B} → 
       Is (Γ ∷ A) · (σ' ∷ t) → 
       Instr Γ σ (σ ∷ M.lam t)
-    -- clo : ∀{n Δ₁ Δ₂ Δ'} →
-    --   {σ : Stack Γ Δ}{σ₁ : Stack Γ Δ₁}{σ₂ : Stack Γ Δ₂}{σ' : Stack (Δ₂ ∷ A) Δ'}
-    --   {t : Tm (Δ₂ ∷ A) B} → 
-    --   ⦃ eq : Δ ≡ (Δ₁ ++ Δ₂) ⦄ → 
-    --   σ ≡ subst (λ z → Stack Γ z) (sym eq) (σ₁ ++s σ₂) → 
-    --   len-C Δ₂ ≡ n → 
-    --   Is (Δ₂ ∷ A) · (σ' ∷ t) → 
-    --   Instr Γ σ (σ₁ ∷ M.lam (t [ ↑ (to-sub σ₂) ]))
+    clo : ∀{@0 Δ₁ Δ₂ Δ'} →
+      {σ : Stack Γ Δ}{σ₁ : Stack Γ Δ₁}{σ₂ : Stack Γ Δ₂}{σ' : Stack (Δ₂ ∷ A) Δ'}
+      {t : Tm (Δ₂ ∷ A) B} → 
+      (n : ℕ) →
+      ⦃ @0 eq : Δ ≡ (Δ₁ ++ Δ₂) ⦄ → 
+      @0 σ ≡ subst (λ z → Stack Γ z) (sym eq) (σ₁ ++s σ₂) → 
+      @0 len-C Δ₂ ≡ n → 
+      Is (Δ₂ ∷ A) · (σ' ∷ t) → 
+      Instr Γ σ (σ₁ ∷ M.lam (t [ ↑ (to-sub σ₂) ]))
     lit : 
       {σ : Stack Γ Δ} → 
       (n : ℕ) → 
@@ -113,6 +114,7 @@ transform-i unit = I.unit
 transform-i (var x) = I.var x
 transform-i (st x) = I.st x
 transform-i (pushc ins) = I.pushc (transform ins)
+transform-i (clo n ⦃ eq ⦄ eq-s len ins) = I.clo n eq len (transform ins)
 transform-i (lit n) = I.lit n
 transform-i suc = I.suc
 transform-i (rec iZ iS) = I.rec (transform iZ) (transform iS)
