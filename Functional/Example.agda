@@ -83,7 +83,6 @@ module Factorial where
   run : Val Nat
   run = exec I
 
-{-
 module Ackermann where 
   open import Functional.TypeMachine.Intrinsic
   
@@ -117,13 +116,10 @@ module Ackermann where
     app ⨾
     ret
 
-  run : (m n : ℕ) → Exec (Ack m n)
+  run : (m n : ℕ) → Val Nat
   run m n = exec (Ack m n)
 
   run43 = exec (Ack 4 3)
-
-  run-v : (m n : ℕ) → S.Val
-  run-v m n = π₁ (run m n)
 
 module Factorial2 where
   open import Functional.TermMachine.Intrinsic

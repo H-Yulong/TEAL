@@ -19,7 +19,7 @@ open M.~Π
 open T using (Stack; ·; _∷_; find-st; _++s_; to-sub)
 
 infixr 20 _⨾_
--- infixl 20 _⋈_
+infixl 20 _⋈i_
 
 private variable
   @0 Γ Γ' Γ'' Δ Δ' Δ'' : Con
@@ -28,32 +28,32 @@ private variable
 mutual
   data Instr : (@0 Γ : Con) → {@0 Δ Δ' : Con} → @0 Stack Γ Δ → @0 Stack Γ Δ' → Set where
     pop : 
-      {σ : Stack Γ Δ}{t : Tm Γ A} →
+      {@0 σ : Stack Γ Δ}{@0 t : Tm Γ A} →
       Instr Γ (σ ∷ t) σ
     swap : 
-      {σ : Stack Γ Δ}{t : Tm Γ A}{t' : Tm Γ B} →
+      {@0 σ : Stack Γ Δ}{@0 t : Tm Γ A}{@0 t' : Tm Γ B} →
       Instr Γ (σ ∷ t ∷ t') (σ ∷ t' ∷ t)
     app : 
-      {σ : Stack Γ Δ}{t : Tm Γ (A ⇒ B)}{t' : Tm Γ A} → 
+      {@0 σ : Stack Γ Δ}{@0 t : Tm Γ (A ⇒ B)}{@0 t' : Tm Γ A} → 
       Instr Γ (σ ∷ t ∷ t') (σ ∷ (M.app t t'))
     unit : 
-      {σ : Stack Γ Δ} → 
+      {@0 σ : Stack Γ Δ} → 
       Instr Γ σ (σ ∷ M.unit)
     var : 
-      {σ : Stack Γ Δ} →
+      {@0 σ : Stack Γ Δ} →
       (x : Var Γ A) → 
       Instr Γ σ (σ ∷ (M.var x))
     st : 
-      {σ : Stack Γ Δ} → 
+      {@0 σ : Stack Γ Δ} → 
       (x : Var Δ A) → 
       Instr Γ σ (σ ∷ (find-st x σ))
     pushc : 
-      {σ : Stack Γ Δ}{σ' : Stack (Γ ∷ A) Δ'}{t : Tm (Γ ∷ A) B} → 
+      {@0 σ : Stack Γ Δ}{@0 σ' : Stack (Γ ∷ A) Δ'}{@0 t : Tm (Γ ∷ A) B} → 
       Is (Γ ∷ A) · (σ' ∷ t) → 
       Instr Γ σ (σ ∷ M.lam t)
     clo : ∀{@0 Δ₁ Δ₂ Δ'} →
-      {σ : Stack Γ Δ}{σ₁ : Stack Γ Δ₁}{σ₂ : Stack Γ Δ₂}{σ' : Stack (Δ₂ ∷ A) Δ'}
-      {t : Tm (Δ₂ ∷ A) B} → 
+      {@0 σ : Stack Γ Δ}{@0 σ₁ : Stack Γ Δ₁}{@0 σ₂ : Stack Γ Δ₂}{@0 σ' : Stack (Δ₂ ∷ A) Δ'}
+      {@0 t : Tm (Δ₂ ∷ A) B} → 
       (n : ℕ) →
       ⦃ @0 eq : Δ ≡ (Δ₁ ++ Δ₂) ⦄ → 
       @0 σ ≡ subst (λ z → Stack Γ z) (sym eq) (σ₁ ++s σ₂) → 
@@ -61,42 +61,42 @@ mutual
       Is (Δ₂ ∷ A) · (σ' ∷ t) → 
       Instr Γ σ (σ₁ ∷ M.lam (t [ ↑ (to-sub σ₂) ]))
     lit : 
-      {σ : Stack Γ Δ} → 
+      {@0 σ : Stack Γ Δ} → 
       (n : ℕ) → 
       Instr Γ σ (σ ∷ M.lit n)
     suc : 
-      {σ : Stack Γ Δ}{t : Tm Γ Nat} → 
+      {@0 σ : Stack Γ Δ}{@0 t : Tm Γ Nat} → 
       Instr Γ (σ ∷ t) (σ ∷ M.suc t)
     rec : 
-      {σ : Stack Γ Δ}{tZ : Tm Γ A}
-      {σ' : Stack (Γ ∷ Nat ∷ A) Δ'}{tS : Tm (Γ ∷ Nat ∷ A) A}
-      {σ'' : Stack Γ Δ''}{n : Tm Γ Nat} → 
+      {@0 σ : Stack Γ Δ}{@0 tZ : Tm Γ A}
+      {@0 σ' : Stack (Γ ∷ Nat ∷ A) Δ'}{@0 tS : Tm (Γ ∷ Nat ∷ A) A}
+      {@0 σ'' : Stack Γ Δ''}{@0 n : Tm Γ Nat} → 
       Is Γ · (σ ∷ tZ) → 
       Is (Γ ∷ Nat ∷ A) · (σ' ∷ tS) → 
       Instr Γ (σ'' ∷ n) (σ'' ∷ M.rec tZ tS n)
     add : 
-      {σ : Stack Γ Δ}{t t' : Tm Γ Nat} → 
+      {@0 σ : Stack Γ Δ}{@0 t t' : Tm Γ Nat} → 
       Instr Γ (σ ∷ t ∷ t') (σ ∷ M.add t t')
     mult :
-      {σ : Stack Γ Δ}{t t' : Tm Γ Nat} → 
+      {@0 σ : Stack Γ Δ}{@0 t t' : Tm Γ Nat} → 
       Instr Γ (σ ∷ t ∷ t') (σ ∷ M.mult t t')
     pair : 
-      {σ : Stack Γ Δ}{t : Tm Γ A}{t' : Tm Γ B} → 
+      {@0 σ : Stack Γ Δ}{@0 t : Tm Γ A}{@0 t' : Tm Γ B} → 
       Instr Γ (σ ∷ t ∷ t') (σ ∷ M.pair t t')
     fst : 
-      {σ : Stack Γ Δ}{t : Tm Γ (A ⊗ B)} → 
+      {@0 σ : Stack Γ Δ}{@0 t : Tm Γ (A ⊗ B)} → 
      Instr Γ (σ ∷ t) (σ ∷ M.fst t)
     snd : 
-      {σ : Stack Γ Δ}{t : Tm Γ (A ⊗ B)} → 
+      {@0 σ : Stack Γ Δ}{@0 t : Tm Γ (A ⊗ B)} → 
       Instr Γ (σ ∷ t) (σ ∷ M.snd t)
 
   data Is (@0 Γ : Con) : {@0 Δ : Con} → @0 Stack Γ Δ → @0 Stack Γ Δ' → Set where
     ret : 
-      {σ : Stack Γ Δ}{t : Tm Γ A}{t' : Tm Γ A} → 
-      ⦃ t ≡ t' ⦄ → 
+      {@0 σ : Stack Γ Δ}{@0 t : Tm Γ A}{@0 t' : Tm Γ A} → 
+      @0 ⦃ t ≡ t' ⦄ → 
       Is Γ (σ ∷ t) (σ ∷ t')
     _⨾_ : 
-      ∀ {σ : Stack Γ Δ}{σ' : Stack Γ Δ'}{σ'' : Stack Γ Δ''} →  
+      ∀ {@0 σ : Stack Γ Δ}{@0 σ' : Stack Γ Δ'}{@0 σ'' : Stack Γ Δ''} →  
       Instr Γ σ σ' → Is Γ σ' σ'' → 
       Is Γ σ σ''
 
@@ -129,3 +129,23 @@ transform (i ⨾ ins) = (transform-i i) I.⨾ (transform ins)
 
 exec : {σ : Stack · Δ}{t : Tm · A} → (ins : Is · · (σ ∷ t)) → I.Val A
 exec ins = I.interp I.⟨ transform ins , I.· , I.· , I.· ⟩
+
+_⋈i_ : 
+  {@0 σ : Stack Γ Δ}{@0 σ' : Stack Γ Δ'}{@0 σ'' : Stack Γ Δ''} →  
+  Is Γ σ σ' → Is Γ σ' σ'' → Is Γ σ σ''
+(ret ⦃ refl ⦄) ⋈i ins' = ins'
+(i ⨾ ins) ⋈i ins' = i ⨾ (ins ⋈i ins')
+
+compile : ∀{@0 σ : Stack Γ Δ} → (t : Source.Tm Γ A) → Is Γ σ (σ ∷ M.compile t)
+compile Source.unit = unit ⨾ ret
+compile (Source.var x) = var x ⨾ ret
+compile (Source.lam t) = pushc (compile t) ⨾ ret
+compile (Source.app t t') = (compile t) ⋈i (compile t') ⋈i (app ⨾ ret)
+compile (Source.lit n) = lit n ⨾ ret
+compile (Source.suc t) = compile t ⋈i (suc ⨾ ret)
+compile (Source.add t t') = (compile t) ⋈i (compile t') ⋈i (add ⨾ ret)
+compile (Source.mult t t') = (compile t) ⋈i (compile t') ⋈i (mult ⨾ ret)
+compile (Source.rec tZ tS t) = (compile t) ⋈i (rec (compile tZ) (compile tS) ⨾ ret)
+compile (Source.pair t t') = (compile t) ⋈i (compile t') ⋈i (pair ⨾ ret)
+compile (Source.fst t) = (compile t) ⋈i (fst ⨾ ret)
+compile (Source.snd t) = (compile t) ⋈i (snd ⨾ ret)
