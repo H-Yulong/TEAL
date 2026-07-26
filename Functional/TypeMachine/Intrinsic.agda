@@ -4,8 +4,10 @@ open import Basic
 open import Context
 
 open import Data.Nat
+open import Data.Nat.Show renaming (show to show-nat)
 open import Data.Product renaming (proj₁ to π₁; proj₂ to π₂) hiding (swap; <_,_>)
 open import Data.Sum hiding (swap)
+open import Data.String renaming (_++_ to _++s_)
 open import Relation.Binary.PropositionalEquality 
 
 import Functional.Syntax as S
@@ -357,3 +359,10 @@ compile (Source.rec tz ts t) = (compile t) ⋈i rec (compile tz) (compile ts) �
 compile (Source.pair t t') = (compile t) ⋈i (compile t') ⋈i pair ⨾ ret
 compile (Source.fst t) = compile t ⋈i fst ⨾ ret
 compile (Source.snd t) = compile t ⋈i snd ⨾ ret
+
+show-V : Val A → String
+show-V <> = "<>"
+show-V < x , x₁ > = "closure"
+show-V (lit-n n) = show-nat n
+show-V (v ,, v') = "< " ++s (show-V v) ++s " , " ++s (show-V v') ++s " >"
+

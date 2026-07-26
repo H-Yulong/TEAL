@@ -1,3 +1,5 @@
+{-# OPTIONS --guardedness #-}
+
 module Main where
 
 -- General helper functions
@@ -39,7 +41,7 @@ import Functional.TypeMachine.Termination
 -- The intrinsic syntax makes it easy to write programs 
 -- and let Agda figure the types out.
 -- See more in the examples
-import Functional.TypeMachine.Intrinsic
+import Functional.TypeMachine.Intrinsic as I
 
 {- Term machine: Γ ⊢ ins : σ ⟶ σ' -}
 
@@ -51,4 +53,9 @@ import Functional.TermMachine.Types
 import Functional.TermMachine.Intrinsic
 
 {- Examples -}
-import Functional.Example
+import Functional.Example as E
+
+open import IO
+
+main : Main
+main = run (putStrLn (I.show-V E.Fib.run))
