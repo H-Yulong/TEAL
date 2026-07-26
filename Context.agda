@@ -7,13 +7,13 @@ infixr 30 _⇒_
 infixl 20 _∷_
 infixl 30 _⊗_
 
-data @0 Ty : Set where
+data Ty : Set where
   One : Ty
   Nat : Ty
   _⇒_ : Ty → Ty → Ty
   _⊗_ : Ty → Ty → Ty
 
-data @0 Con : Set where
+data Con : Set where
   · : Con
   _∷_ : Con → Ty → Con
 
