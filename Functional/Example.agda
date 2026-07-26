@@ -124,7 +124,9 @@ module Ackermann where
 module Factorial2 where
   open import Functional.TermMachine.Intrinsic
   open import Functional.Calculus.Syntax
+  import Functional.TypeMachine.Intrinsic as I
   import Functional.TermMachine.Types as T
+  
   import Functional.Calculus.Shallow as M
 
   source : Tm · (Nat ⇒ Nat)
@@ -133,13 +135,14 @@ module Factorial2 where
   target : Is · T.· (T.· T.∷ M.lit 120)
   target = compile (app source (lit 5))
 
-  run : Exec target
+  run : I.Val Nat
   run = exec target
 
 module Fib where
   open import Functional.TermMachine.Intrinsic
   open import Functional.Calculus.Syntax
   import Functional.TermMachine.Types as T
+  import Functional.TypeMachine.Intrinsic as I
   import Functional.Calculus.Shallow as M
 
   source : Tm · (Nat ⇒ Nat)
@@ -162,8 +165,8 @@ module Fib where
   target : Is · T.· (T.· T.∷ M.lit 55)
   target = compile (fib 10)
 
-  run : Exec target
+  run : I.Val Nat
   run = exec target
 
 open import Functional.TermMachine.Intrinsic
--} 
+
