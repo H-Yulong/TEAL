@@ -7,7 +7,7 @@ open import Basic
 open import Context
 import Functional.Syntax as S
 
-module E1 where
+module @0 E1 where
   open S
   open import Functional.TypeMachine.Types
   open import Functional.TypeMachine.Termination
@@ -53,7 +53,7 @@ module E2 where
     app ⨾ 
     ret 
   
-  run : Exec I
+  run : Val One
   run = exec I
 
 module Factorial where
@@ -80,10 +80,10 @@ module Factorial where
   target : Is · · (· ∷ Nat)
   target = compile (app source (lit 5))
 
-
-  run : Exec I
+  run : Val Nat
   run = exec I
 
+{-
 module Ackermann where 
   open import Functional.TypeMachine.Intrinsic
   
@@ -170,3 +170,4 @@ module Fib where
   run = exec target
 
 open import Functional.TermMachine.Intrinsic
+-} 

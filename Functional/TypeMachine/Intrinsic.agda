@@ -12,6 +12,8 @@ import Functional.Syntax as S
 import Functional.TypeMachine.Types as T
 import Functional.TypeMachine.Termination as H
 
+import Functional.Calculus.Syntax as Source
+
 open S using ([_↦_]∈_; _⇓₀_,_; _⋈e_; len-E)
 open T using (_⊢ᵢ_∈_⟶_; _⊢_∈_⟶_; ⊢_∈_; _⊨_; _⊢ᵣ_∈_⟶_ )
 
@@ -21,6 +23,7 @@ private variable
 
 infixl 20 _∷_
 infixr 20 _⨾_
+infixl 15 _⋈i_
 
 data Instr : @0 Con → @0 Con → @0 Con → Set
 data Is : @0 Con → @0 Con → @0 Con → Set
@@ -334,3 +337,23 @@ result (conf-exe ⟨ ret , env , stack ∷ v , · ⟩ (stop pf)) = v
 interp : ∀{@0 A₀} → (c : Config A₀) → Val A₀
 interp c = result (step-exe (conf-exe c (halt-lemma c (π₂ (π₂ (Termination c))))))
 
+exec : Is · · (· ∷ A) → Val A
+exec ins = interp ⟨ ins , · , · , · ⟩
+
+_⋈i_ : Is Γ Δ Δ' → Is Γ Δ' Δ'' → Is Γ Δ Δ''
+ret ⋈i ins' = ins'
+(i ⨾ ins) ⋈i ins' = i ⨾ (ins ⋈i ins')
+
+compile : Source.Tm Γ A → Is Γ Δ (Δ ∷ A)
+compile Source.unit = unit ⨾ ret
+compile (Source.var x) = var x ⨾ ret
+compile (Source.lam t) = pushc (compile t) ⨾ ret
+compile (Source.app t t') = (compile t) ⋈i (compile t') ⋈i app ⨾ ret
+compile (Source.lit n) = lit n ⨾ ret
+compile (Source.suc t) = (compile t) ⋈i suc ⨾ ret
+compile (Source.add t t') = (compile t) ⋈i (compile t') ⋈i add ⨾ ret
+compile (Source.mult t t') = (compile t) ⋈i (compile t') ⋈i mult ⨾ ret
+compile (Source.rec tz ts t) = (compile t) ⋈i rec (compile tz) (compile ts) ⨾ ret
+compile (Source.pair t t') = (compile t) ⋈i (compile t') ⋈i pair ⨾ ret
+compile (Source.fst t) = compile t ⋈i fst ⨾ ret
+compile (Source.snd t) = compile t ⋈i snd ⨾ ret

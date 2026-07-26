@@ -32,7 +32,7 @@ v₃ = vs (vs (vs v₀))
 
 {- Renamings -}
 @0 Ren : @0 Con → @0 Con → Set
-Ren Γ Δ = ∀{A} → Var Γ A → Var Δ A
+Ren Γ Δ = ∀{@0 A} → Var Γ A → Var Δ A
 
 ext : ∀{@0 Γ Δ A} → Ren Γ Δ → Ren (Γ ∷ A) (Δ ∷ A)
 ext ρ v₀ = v₀

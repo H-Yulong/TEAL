@@ -1,4 +1,4 @@
-module @0 Functional.Calculus.Syntax where
+module Functional.Calculus.Syntax where
 
 open import Basic
 open import Context
@@ -9,21 +9,21 @@ infix 20 _[_]
 infix 5 _≡β_
 infixl 30 _▻_
 
-data Tm : Con → Ty → Set where
-  unit : ∀{Γ} → Tm Γ One
-  var : ∀{Γ A} → Var Γ A → Tm Γ A
-  lam : ∀{Γ A B} → Tm (Γ ∷ A) B → Tm Γ (A ⇒ B)
-  app : ∀{Γ A B} → Tm Γ (A ⇒ B) → Tm Γ A → Tm Γ B
-  lit : ∀{Γ} → (n : ℕ) → Tm Γ Nat
-  suc : ∀{Γ} → Tm Γ Nat → Tm Γ Nat
-  add mult : ∀{Γ} → Tm Γ Nat → Tm Γ Nat → Tm Γ Nat
-  rec : ∀{Γ A} → Tm Γ A → Tm (Γ ∷ Nat ∷ A) A → Tm Γ Nat → Tm Γ A
-  pair : ∀{Γ A B} → Tm Γ A → Tm Γ B → Tm Γ (A ⊗ B)
-  fst : ∀{Γ A B} → Tm Γ (A ⊗ B) → Tm Γ A
-  snd : ∀{Γ A B} → Tm Γ (A ⊗ B) → Tm Γ B
+data Tm : @0 Con → @0 Ty → Set where
+  unit : ∀{@0 Γ} → Tm Γ One
+  var : ∀{@0 Γ A} → Var Γ A → Tm Γ A
+  lam : ∀{@0 Γ A B} → Tm (Γ ∷ A) B → Tm Γ (A ⇒ B)
+  app : ∀{@0 Γ A B} → Tm Γ (A ⇒ B) → Tm Γ A → Tm Γ B
+  lit : ∀{@0 Γ} → (n : ℕ) → Tm Γ Nat
+  suc : ∀{@0 Γ} → Tm Γ Nat → Tm Γ Nat
+  add mult : ∀{@0 Γ} → Tm Γ Nat → Tm Γ Nat → Tm Γ Nat
+  rec : ∀{@0 Γ A} → Tm Γ A → Tm (Γ ∷ Nat ∷ A) A → Tm Γ Nat → Tm Γ A
+  pair : ∀{@0 Γ A B} → Tm Γ A → Tm Γ B → Tm Γ (A ⊗ B)
+  fst : ∀{@0 Γ A B} → Tm Γ (A ⊗ B) → Tm Γ A
+  snd : ∀{@0 Γ A B} → Tm Γ (A ⊗ B) → Tm Γ B
 
 {- Renaming and substitution -}
-ren : ∀{Γ Δ A} → Tm Γ A → Ren Γ Δ → Tm Δ A
+ren : ∀{@0 Γ Δ A} → Tm Γ A → Ren Γ Δ → Tm Δ A
 ren unit ρ = unit
 ren (var x) ρ = var (ρ x)
 ren (lam t) ρ = lam (ren t (ext ρ))
@@ -37,14 +37,14 @@ ren (pair t t') ρ = pair (ren t ρ) (ren t' ρ)
 ren (fst t) ρ = fst (ren t ρ)
 ren (snd t) ρ = snd (ren t ρ)
 
-Sub : Con → Con → Set
-Sub Γ Δ = ∀{A} → Var Δ A → Tm Γ A
+Sub : @0 Con → @0 Con → Set
+Sub Γ Δ = ∀{@0 A} → Var Δ A → Tm Γ A
 
-↑ : ∀{Γ Δ A} → Sub Γ Δ → Sub (Γ ∷ A) (Δ ∷ A)
+↑ : ∀{@0 Γ Δ A} → Sub Γ Δ → Sub (Γ ∷ A) (Δ ∷ A)
 ↑ σ v₀ = var v₀
 ↑ σ (vs x) = ren (σ x) vs
 
-_[_] : ∀{Γ Δ A} → Tm Δ A → Sub Γ Δ → Tm Γ A
+_[_] : ∀{@0 Γ Δ A} → Tm Δ A → Sub Γ Δ → Tm Γ A
 unit [ σ ] = unit
 var x [ σ ] = σ x
 lam t [ σ ] = lam (t [ ↑ σ ])
@@ -58,20 +58,20 @@ pair t t' [ σ ] = pair (t [ σ ]) (t' [ σ ])
 fst t [ σ ] = fst (t [ σ ])
 snd t [ σ ] = snd (t [ σ ])
 
-✧ : ∀{Γ} → Sub Γ Γ
+✧ : ∀{@0 Γ} → Sub Γ Γ
 ✧ x = var x
 
-⊘ : ∀{Γ} → Sub Γ ·
+⊘ : ∀{@0 Γ} → Sub Γ ·
 ⊘ ()
 
-_▻_ : ∀{Γ Δ A} → Sub Γ Δ → Tm Γ A → Sub Γ (Δ ∷ A)
+_▻_ : ∀{@0 Γ Δ A} → Sub Γ Δ → Tm Γ A → Sub Γ (Δ ∷ A)
 (σ ▻ t) v₀ = t
 (σ ▻ t) (vs x) = σ x
 
-_~_ : ∀{Γ Δ Δ'} → Sub Γ Δ → Sub Δ' Γ → Sub Δ' Δ
+_~_ : ∀{@0 Γ Δ Δ'} → Sub Γ Δ → Sub Δ' Γ → Sub Δ' Δ
 (σ ~ σ') x = (σ x) [ σ' ]
 
-data _≡β_ : {Γ : Con} {A : Ty} → (t t' : Tm Γ A) → Set where
+data @0 _≡β_ : {Γ : Con} {A : Ty} → (t t' : Tm Γ A) → Set where
   β : 
     ∀{Γ A B}{t : Tm (Γ ∷ A) B}{t' : Tm Γ A} → 
     app (lam t) t' ≡β t [ ✧ ▻ t' ] 

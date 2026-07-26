@@ -127,7 +127,5 @@ transform-i snd = I.snd
 transform ret = I.ret
 transform (i ⨾ ins) = (transform-i i) I.⨾ (transform ins)
 
-interp : {σ : Stack · Δ}{t : Tm · A} → (ins : Is · · (σ ∷ t)) → I.Val A
-interp ins = I.interp I.⟨ transform ins , I.· , I.· , I.· ⟩
-
-
+exec : {σ : Stack · Δ}{t : Tm · A} → (ins : Is · · (σ ∷ t)) → I.Val A
+exec ins = I.interp I.⟨ transform ins , I.· , I.· , I.· ⟩
