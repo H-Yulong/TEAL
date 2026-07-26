@@ -106,10 +106,10 @@ module Ackermann where
       -- λ f n x. rec(x, (_,p).f p, n)
       var v₁ ⨾ 
       rec 
-        (var v₁ ⨾ ret) 
+        (var v₀ ⨾ ret) 
         (var (vs (vs v₂)) ⨾ var v₀ ⨾ app ⨾ ret) ⨾ 
       ret) ⨾ ret) ⨾ ret
-    ) ⨾
+      ) ⨾
     app ⨾
     lit m ⨾
     app ⨾ 
