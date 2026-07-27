@@ -1,4 +1,4 @@
-module @0 Functional.TermMachine.Types where
+module Functional.TermMachine.Types where
 
 open import Data.Product using (Σ; _×_; _,_) renaming (proj₁ to π₁; proj₂ to π₂)
 open import Data.Sum hiding (swap)
@@ -29,19 +29,19 @@ open M.~Π
 
 
 private variable
-  Γ Γ' Γ'' Δ Δ' Δ'' : Con
-  A A' B B' C C' A₀ : Ty
-  ins ins' ins'' : Is
-  v v' v'' : Val
-  env env' env'' stack stack' stack'' : Env
-  fr fr' : Frame
-  c c' c'' c₀ : Config
+  @0 Γ Γ' Γ'' Δ Δ' Δ'' : Con
+  @0 A A' B B' C C' A₀ : Ty
+  @0 ins ins' ins'' : Is
+  @0 v v' v'' : Val
+  @0 env env' env'' stack stack' stack'' : Env
+  @0 fr fr' : Frame
+  @0 c c' c'' c₀ : Config
 
 
 infix 10 _⊢ᵢ_∈_⟶_
 infix 10 _⊢_∈_⟶_
 
-data Stack (Γ : Con) : Con → Set where
+data Stack (@0 Γ : Con) : @0 Con → Set where
   · : Stack Γ ·
   _∷_ : Stack Γ Δ → Tm Γ A → Stack Γ (Δ ∷ A)
 
@@ -49,7 +49,7 @@ find-st : Var Δ A → Stack Γ Δ → Tm Γ A
 find-st v₀ (σ ∷ t) = t
 find-st (vs v) (σ ∷ t) = find-st v σ
 
-to-sub : Stack Γ Δ → Sub Γ Δ
+@0 to-sub : Stack Γ Δ → Sub Γ Δ
 to-sub · = ⊘
 to-sub (σ ∷ t) = to-sub σ ▻ t
 
@@ -201,7 +201,7 @@ record WF-Config (A₀ : Ty) (c : Config) : Set where
     eq : t [ γ ] ≡ t' [ γ' ] 
 
 mutual
-  transform-i : 
+  @0 transform-i : 
     {σ : Stack Γ Δ}{σ' : Stack Γ Δ'}{ins : Instr} → 
     Γ ⊢ᵢ ins ∈ σ ⟶ σ' → Γ T.⊢ᵢ ins ∈ Δ ⟶ Δ'
   transform-i Ty-pop = T.Ty-pop
@@ -221,30 +221,30 @@ mutual
   transform-i Ty-fst = T.Ty-fst
   transform-i Ty-snd = T.Ty-snd
 
-  transform : 
+  @0 transform : 
     {σ : Stack Γ Δ}{σ' : Stack Γ Δ'}{ins : Is} → 
     Γ ⊢ ins ∈ σ ⟶ σ' → Γ T.⊢ ins ∈ Δ ⟶ Δ'
   transform Ty-ret = T.Ty-ret
   transform (Ty-⨾ i ins) = T.Ty-⨾ (transform-i i) (transform ins)
 
 mutual
-  transform-v : {t : Tm · A} → ⊢ v == t → T.⊢ v ∈ A
+  @0 transform-v : {t : Tm · A} → ⊢ v == t → T.⊢ v ∈ A
   transform-v Ty-unit = T.Ty-unit
   transform-v Ty-nat = T.Ty-nat
   transform-v (Ty-clo env ins) = T.Ty-clo (transform-env env) (transform ins)
   transform-v (Ty-pair v v') = T.Ty-pair (transform-v v) (transform-v v')
 
-  transform-env : {γ : Sub · Γ} → env ⊨ Γ as γ → env T.⊨ Γ
+  @0 transform-env : {γ : Sub · Γ} → env ⊨ Γ as γ → env T.⊨ Γ
   transform-env Env-nil = T.Env-nil
   transform-env (Env-cons v env) = T.Env-cons (transform-v v) (transform-env env)
 
-transform-st : 
+@0 transform-st : 
   {γ : Sub · Γ}{env⊨ : env ⊨ Γ as γ}{σ : Stack Γ Δ} → 
   env⊨ ⊢[ stack ⊨ σ ] → stack T.⊨ Δ 
 transform-st St-nil = T.Env-nil
 transform-st (St-cons sta v) = T.Env-cons (transform-v v) (transform-st sta)
 
-transform-fr : 
+@0 transform-fr : 
   {γ : Sub · Γ}{t : Tm Γ A}
   {env⊨ : env ⊨ Γ as γ} → 
   env⊨ ⊢ᵣ fr ∈ t ⟶ A₀ →
@@ -253,34 +253,34 @@ transform-fr Frame-nil = T.Frame-nil
 transform-fr (Frame-cons pf ins env⊨ stack) = 
   T.Frame-cons (transform-fr pf) (transform ins) (transform-env env⊨) (transform-st stack)
 
-transform-c : {c : Config} → WF-Config A₀ c → T.WF-Config A₀ c
+@0 transform-c : {c : Config} → WF-Config A₀ c → T.WF-Config A₀ c
 transform-c (well-formed ty-ins ty-env ty-st ty-fr eq) = 
   T.well-formed (transform ty-ins) (transform-env ty-env) (transform-st ty-st) (transform-fr ty-fr)
 
-find-var : {γ : Sub · Γ} → (x : Var Γ A) → env ⊨ Γ as γ → Σ Val (λ v → [ x ↦ v ]∈ env)
+@0 find-var : {γ : Sub · Γ} → (x : Var Γ A) → env ⊨ Γ as γ → Σ Val (λ v → [ x ↦ v ]∈ env)
 find-var {env = env ∷ v} v₀ (Env-cons tv ty-env) = v , hd
 find-var {env = env ∷ _} (vs x) (Env-cons _ ty-env) =
   let (v , pf) = find-var x ty-env in 
     v , tl pf
 
-find-var-st : {γ : Sub · Γ}{σ : Stack Γ Δ}{env⊨ : env ⊨ Γ as γ} → 
+@0 find-var-st : {γ : Sub · Γ}{σ : Stack Γ Δ}{env⊨ : env ⊨ Γ as γ} → 
   (x : Var Δ A) → env⊨ ⊢[ stack ⊨ σ ] → Σ Val (λ v → [ x ↦ v ]∈ stack) 
 find-var-st {stack = stack ∷ v} v₀ (St-cons ty-st ta) = v , hd
 find-var-st {stack = stack ∷ v} (vs x) (St-cons ty-st ta) = 
   let (v , pf) = find-var-st x ty-st in 
     v , tl pf
   
-ty-[↦]∈ : {γ : Sub · Γ}{x : Var Γ A} → env ⊨ Γ as γ → [ x ↦ v ]∈ env → ⊢ v == ((M.var x) [ γ ])
+@0 ty-[↦]∈ : {γ : Sub · Γ}{x : Var Γ A} → env ⊨ Γ as γ → [ x ↦ v ]∈ env → ⊢ v == ((M.var x) [ γ ])
 ty-[↦]∈ (Env-cons tv ty-env) hd = tv
 ty-[↦]∈ (Env-cons tv ty-env) (tl tx) = ty-[↦]∈ ty-env tx
 
-st-[↦]∈ : 
+@0 st-[↦]∈ : 
   {γ : Sub · Γ}{env⊨ : env ⊨ Γ as γ}{σ : Stack Γ Δ}{x : Var Δ A} → 
   env⊨ ⊢[ stack ⊨ σ ] → [ x ↦ v ]∈ stack → ⊢ v == ((find-st x σ) [ γ ])
 st-[↦]∈ (St-cons ty-st tv) hd = tv
 st-[↦]∈ (St-cons ty-st tv) (tl tx) = st-[↦]∈ ty-st tx
 
-⊨++ : ∀{Δ₁ Δ₂} →
+@0 ⊨++ : ∀{Δ₁ Δ₂} →
   {γ : Sub · Γ}{env⊨ : env ⊨ Γ as γ} → 
   {σ : Stack Γ Δ}{σ₁ : Stack Γ Δ₁}{σ₂ : Stack Γ Δ₂} → 
   ⦃ eq : Δ ≡ (Δ₁ ++ Δ₂) ⦄ → 
@@ -295,13 +295,13 @@ st-[↦]∈ (St-cons ty-st tv) (tl tx) = st-[↦]∈ ty-st tx
   let s1 , s2 , eq , ty-s1 , ty-s2 = ⊨++ {σ₂ = σ₂} ty-st refl in
     s1 , s2 ∷ v , cong (λ z → z ∷ v) eq , ty-s1 , St-cons ty-s2 tv
 
-⊨-len : ∀{n} → 
+@0 ⊨-len : ∀{n} → 
   {γ : Sub · Γ}{env⊨ : env ⊨ Γ as γ}{σ : Stack Γ Δ} → 
   env⊨ ⊢[ stack ⊨ σ ] → len-C Δ ≡ n → len-E stack ≡ n
 ⊨-len St-nil refl = refl
 ⊨-len (St-cons ty-st x) refl = cong suc (⊨-len ty-st refl)
 
-⋈e⊨++ : 
+@0 ⋈e⊨++ : 
   ∀{Δ₁ Δ₂ s1 s2} →
   {γ : Sub · Γ}{env⊨ : env ⊨ Γ as γ} →
   {σ : Stack Γ Δ}{σ₁ : Stack Γ Δ₁}{σ₂ : Stack Γ Δ₂} →
@@ -316,7 +316,7 @@ st-[↦]∈ (St-cons ty-st tv) (tl tx) = st-[↦]∈ ty-st tx
   let (ty-s1 , ty-s2) = ⋈e⊨++ {σ₂ = σ₂} ty-st refl refl (suc-inj eq-len) in  
   ty-s1 , Env-cons tv ty-s2
 
-Progress : WF-Config A₀ c → (Σ Val (λ v → c ⇓₀ v , zero)) ⊎ (Σ Config (λ c' → c ⟶ c'))
+@0 Progress : WF-Config A₀ c → (Σ Val (λ v → c ⇓₀ v , zero)) ⊎ (Σ Config (λ c' → c ⟶ c'))
 Progress {c = ⟨ ins , env , stack ∷ v , · ⟩} (well-formed Ty-ret ty-env (St-cons ty-st tv) Frame-nil eq) = 
   inj₁ (v , finish)
 Progress (well-formed Ty-ret ty-env (St-cons ty-st x₂) (Frame-cons ty-fr x env⊨ x₁) eq) = 
@@ -358,13 +358,13 @@ Progress (well-formed (Ty-⨾ Ty-fst ty-ins) ty-env (St-cons ty-st (Ty-pair ta t
 Progress (well-formed (Ty-⨾ Ty-snd ty-ins) ty-env (St-cons ty-st (Ty-pair ta tb)) ty-fr eq) = 
   inj₂ (_ , Op-snd)
 
-~λ≡ : {t t' : Tm · A} → t ≡ t' → t .~fun tt ≡ t' .~fun tt
+@0 ~λ≡ : {t t' : Tm · A} → t ≡ t' → t .~fun tt ≡ t' .~fun tt
 ~λ≡ refl = refl
 
-~λ-ext : {t t' : Tm · A} → t .~fun tt ≡ t' .~fun tt → t ≡ t'
+@0 ~λ-ext : {t t' : Tm · A} → t .~fun tt ≡ t' .~fun tt → t ≡ t'
 ~λ-ext pf = cong ~λ (ext-tt pf)
 
-Preservation : c ⟶ c' → WF-Config A₀ c → WF-Config A₀ c'
+@0 Preservation : c ⟶ c' → WF-Config A₀ c → WF-Config A₀ c'
 Preservation Op-pop (well-formed (Ty-⨾ Ty-pop ty-ins) ty-env (St-cons ty-st _) ty-fr eq) = 
   well-formed ty-ins ty-env ty-st ty-fr eq
 Preservation Op-swap (well-formed (Ty-⨾ Ty-swap ty-ins) ty-env (St-cons (St-cons ty-st x₁) x) ty-fr eq) = 
@@ -426,22 +426,22 @@ Preservation Op-fst (well-formed (Ty-⨾ Ty-fst ty-ins) ty-env (St-cons ty-st (T
 Preservation Op-snd (well-formed (Ty-⨾ Ty-snd ty-ins) ty-env (St-cons ty-st (Ty-pair ta tb ⦃ eq' ⦄)) ty-fr eq) = 
   well-formed ty-ins ty-env (St-cons ty-st (subst (λ z → ⊢ _ == z) (M.proj₂ eq') tb)) ty-fr eq
 
-Preservation* : c ⟶* c' → WF-Config A₀ c → WF-Config A₀ c'
+@0 Preservation* : c ⟶* c' → WF-Config A₀ c → WF-Config A₀ c'
 Preservation* ε wf = wf
 Preservation* (a ∷ σ) wf = Preservation* σ (Preservation a wf)
 
-Termination : WF-Config A₀ c → (Σ Val (λ v → c ⇓ v))
+@0 Termination : WF-Config A₀ c → (Σ Val (λ v → c ⇓ v))
 Termination wf = H.Termination (transform-c wf)
 
 -- Expected result according to specification
-fr-res : ∀{γ : Sub · Γ}{env⊨ : env ⊨ Γ as γ}{t : Tm Γ A} → env⊨ ⊢ᵣ fr ∈ t ⟶ A₀ → Tm · A₀
+@0 fr-res : ∀{γ : Sub · Γ}{env⊨ : env ⊨ Γ as γ}{t : Tm Γ A} → env⊨ ⊢ᵣ fr ∈ t ⟶ A₀ → Tm · A₀
 fr-res (Frame-nil {t = t}) = t
 fr-res (Frame-cons fr x env⊨ x₁) = fr-res fr
 
-Exp : WF-Config A₀ c → Tm · A₀
+@0 Exp : WF-Config A₀ c → Tm · A₀
 Exp (well-formed ty-ins ty-env ty-st ty-fr eq) = fr-res ty-fr
 
-Preservation-Exp : (a : c ⟶ c') → (wf : WF-Config A₀ c) → Exp (Preservation a wf) ≡ Exp wf
+@0 Preservation-Exp : (a : c ⟶ c') → (wf : WF-Config A₀ c) → Exp (Preservation a wf) ≡ Exp wf
 Preservation-Exp Op-pop (well-formed (Ty-⨾ Ty-pop ty-ins) ty-env (St-cons ty-st _) ty-fr eq) = refl
 Preservation-Exp Op-swap (well-formed (Ty-⨾ Ty-swap ty-ins) ty-env (St-cons (St-cons ty-st x₁) x) ty-fr eq) = refl
 Preservation-Exp Op-app (well-formed (Ty-⨾ Ty-app ty-ins) ty-env (St-cons (St-cons ty-st (Ty-clo ty-env' ty-ins' ⦃ eq-f ⦄)) tv) ty-fr eq) = refl
@@ -461,19 +461,19 @@ Preservation-Exp Op-pair (well-formed (Ty-⨾ Ty-pair ty-ins) ty-env (St-cons (S
 Preservation-Exp Op-fst (well-formed (Ty-⨾ Ty-fst ty-ins) ty-env (St-cons ty-st (Ty-pair ta tb ⦃ eq' ⦄)) ty-fr eq) = refl
 Preservation-Exp Op-snd (well-formed (Ty-⨾ Ty-snd ty-ins) ty-env (St-cons ty-st (Ty-pair ta tb ⦃ eq' ⦄)) ty-fr eq) = refl
 
-Partial-Correctness : c ⇓ v → (wf : WF-Config A₀ c) → ⊢ v == Exp wf
+@0 Partial-Correctness : c ⇓ v → (wf : WF-Config A₀ c) → ⊢ v == Exp wf
 Partial-Correctness (halt σ) wf = aux σ wf
   where
     aux : c ⟶* ⟨ ret , env , stack ∷ v , · ⟩ → (wf : WF-Config A₀ c) → ⊢ v == Exp wf
     aux ε (well-formed (Ty-ret ⦃ refl ⦄) ty-env (St-cons ty-st tv) Frame-nil refl) = tv
     aux {v = v} (a ∷ σ) wf = subst (λ z → ⊢ v == z) (Preservation-Exp a wf) (aux σ (Preservation a wf))
 
-Total-Correctness : (wf : WF-Config A₀ c) → Σ Val (λ v → (c ⇓ v) × ⊢ v == Exp wf)
+@0 Total-Correctness : (wf : WF-Config A₀ c) → Σ Val (λ v → (c ⇓ v) × ⊢ v == Exp wf)
 Total-Correctness wf = 
   let (v , σ) = Termination wf in
     v , σ , (Partial-Correctness σ wf)
 
-Total-Correctness-Prog : 
+@0 Total-Correctness-Prog : 
   {σ : Stack · Δ}{t : Tm · A} → 
   · ⊢ ins ∈ · ⟶ (σ ∷ t) → Σ Val (λ v → ⟨ ins , · , · , · ⟩ ⇓ v × ⊢ v == t)
 Total-Correctness-Prog ty-ins = Total-Correctness (well-formed ty-ins Env-nil St-nil Frame-nil refl)

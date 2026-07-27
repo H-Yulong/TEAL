@@ -1,5 +1,3 @@
-{-# OPTIONS --guardedness #-}
-
 module Main where
 
 -- General helper functions
@@ -50,7 +48,7 @@ import Functional.TypeMachine.Intrinsic as I
 import Functional.TermMachine.Types
 
 -- Intrinsic syntax, compilation from STLC
-import Functional.TermMachine.Intrinsic
+import Functional.TermMachine.Intrinsic as TI
 
 {- Examples -}
 import Functional.Example as E
@@ -58,4 +56,5 @@ import Functional.Example as E
 open import IO
 
 main : Main
-main = run (putStrLn (I.show-V E.Fib.run))
+main = run (TI.show-exe (E.Factorial2.target))
+-- main = run (I.show-exe I.⟨ E.Factorial.I , I.· , I.· , I.· ⟩)

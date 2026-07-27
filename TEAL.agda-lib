@@ -4,4 +4,5 @@ include: .
 flags:
   --erasure
   --erased-matches
+  --guardedness
   

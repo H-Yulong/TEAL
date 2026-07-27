@@ -360,9 +360,58 @@ compile (Source.pair t t') = (compile t) ⋈i (compile t') ⋈i pair ⨾ ret
 compile (Source.fst t) = compile t ⋈i fst ⨾ ret
 compile (Source.snd t) = compile t ⋈i snd ⨾ ret
 
+show-var : Var Γ A → String
+show-var v = show-nat (aux v)
+  where
+    aux : Var Γ A → ℕ
+    aux v₀ = 0
+    aux (vs v) = suc (aux v)
+
+show-i : Instr Γ Δ Δ' → String
+show-is : Is Γ Δ Δ' → String
+
+show-i pop = "pop"
+show-i swap = "swap"
+show-i app = "app"
+show-i unit = "unit"
+show-i (var x) = "var " ++s (show-var x)
+show-i (st x) = "st "  ++s (show-var x)
+show-i (pushc ins) = "pushc [" ++s (show-is ins) ++s "]"
+show-i (clo n _ _ ins) = "clo " ++s (show-nat n) ++s " [" ++s (show-is ins) ++s "] "
+show-i (lit n) = "lit " ++s (show-nat n)
+show-i suc = "suc"
+show-i (rec iz is) = "rec (" ++s (show-is iz) ++s ") (" ++s (show-is is)  ++s ")"
+show-i add = "add"
+show-i mult = "mult"
+show-i pair = "pair"
+show-i fst = "fst"
+show-i snd = "snd"
+
+show-is ret = "ret"
+show-is (i ⨾ ins) = (show-i i) ++s " ; " ++s (show-is ins)
+
 show-V : Val A → String
+show-E : Env Γ → String
+
 show-V <> = "<>"
-show-V < x , x₁ > = "closure"
+show-V < env , ins > = "< " ++s (show-E env) ++s " ;; " ++s (show-is ins) ++s " >"
 show-V (lit-n n) = show-nat n
 show-V (v ,, v') = "< " ++s (show-V v) ++s " , " ++s (show-V v') ++s " >"
 
+show-E · = ""
+show-E (env ∷ v) = (show-E env) ++s " ∷ " ++s (show-V v)
+
+open import IO
+open import Agda.Primitive
+import Data.Unit.Polymorphic.Base as Base
+
+show-exe : ∀{@0 A₀} → Config A₀ → IO {lzero} (Base.⊤)
+show-exe c = aux (conf-exe c (halt-lemma c (π₂ (π₂ (Termination c))))) 
+  where
+    aux : ∀{@0 A₀ n} → Config-exe A₀ n → IO {lzero} (Base.⊤)
+    aux (conf-exe ⟨ ret , env , stack ∷ v , · ⟩ (stop pf)) = putStrLn (show-V v)
+    aux (conf-exe ⟨ ins , env , stack , fr ⟩ (go pf)) = 
+      let c = ⟨ ins , env , stack , fr ⟩ in
+        do
+          putStrLn (show-is ins)
+          aux ((conf-exe (step c) (halt-lemma (step c) (step-lemma c pf))))

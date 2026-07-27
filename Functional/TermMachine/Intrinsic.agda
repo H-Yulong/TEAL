@@ -149,3 +149,11 @@ compile (Source.rec tZ tS t) = (compile t) ⋈i (rec (compile tZ) (compile tS) �
 compile (Source.pair t t') = (compile t) ⋈i (compile t') ⋈i (pair ⨾ ret)
 compile (Source.fst t) = (compile t) ⋈i (fst ⨾ ret)
 compile (Source.snd t) = (compile t) ⋈i (snd ⨾ ret)
+
+open import IO
+open import Agda.Primitive
+import Data.Unit.Polymorphic.Base as Base
+
+show-exe : {@0 σ : Stack · Δ}{@0 t : Tm · A} → (ins : Is · · (σ ∷ t)) → IO {lzero} (Base.⊤)
+show-exe ins = I.show-exe I.⟨ transform ins , I.· , I.· , I.· ⟩
+
